@@ -1,0 +1,59 @@
+# Fire Escape
+
+Ein schwerer 2D-Plattformer im Browser. Der Turm wird heute Nacht abgerissen und du stehst noch im 12. Stock.
+Jede Etage hat genau ein grünes Notausgangsschild – lauf, spring, stoß dich von Wänden ab und dash dich nach unten
+bis zur Straße. Stacheln, Sägen und der Abgrund schicken dich zurück zur letzten Checkpoint-Fahne.
+
+Alles steckt in einer einzigen Datei: `index.html` im Browser öffnen und losspielen. Keine Installation, kein Build.
+
+## Steuerung
+
+| Tastatur | Gamepad | Touch | Aktion |
+|---|---|---|---|
+| ← → / A D | Stick, Steuerkreuz | linke Bildschirmhälfte | laufen |
+| Leertaste / Z | A, Y | rechte Bildschirmhälfte | springen (kurz tippen = kleiner Hüpfer, halten = hoch) |
+| X / Shift | B, X, RB, RT | Dash-Knopf | Dash in 8 Richtungen (ab Etage 10) |
+| R | Select | – | zurück zur letzten Checkpoint-Fahne |
+| Esc / P | Start | II | Pause: Etage neu starten, überspringen, Ton |
+| M | – | – | Ton an/aus |
+
+- **Wandsprung:** an einer Wand noch einmal springen.
+- **Super:** während eines Dashes am Boden springen – der Sprung behält das Dash-Tempo.
+  Schräg nach unten in den Boden dashen und dann springen ergibt einen flacheren, schnelleren **Hyper**.
+- Fortschritt und Bestzeit speichert der Browser (localStorage).
+
+## Etagen
+
+| Etage | Name | Neu |
+|---|---|---|
+| 12 | Roof Access | Springen, Stachel-Decken |
+| 11 | Elevator Shaft | Wandsprünge |
+| 10 | Open Plan | Dash, Super |
+| 9 | Rotten Floor | morsche Bretter, die nachgeben |
+| 8 | Machine Shop | Sägen auf Schienen |
+| 7 | Break Room | gelbe Funken füllen den Dash in der Luft auf |
+| 6 | Gym | Sprungfedern |
+| 5 | Scaffolding | Gerüstbretter, durch die man von unten springt; kreisende Sägen |
+| 4 | Ventilation | enge Schächte |
+| 3 | Collapse | nichts unter den Füßen |
+| 2 | Atrium | alles zusammen |
+| 1 | Lobby | das Finale |
+
+## Level bearbeiten
+
+Die Etagen stehen als ASCII-Karten (40 × 23 Kacheln) in `tools/levels.txt`; die Legende steht oben in der Datei.
+Nach einer Änderung:
+
+```sh
+python3 tools/build_levels.py   # schreibt die Level in index.html
+tools/check.sh                  # prüft jede Etage mit dem Bot
+```
+
+Die Werkzeuge laufen mit `gjs` (bei Fedora/GNOME dabei), Node wird nicht gebraucht.
+
+- `tools/solve.js` – ein Bot sucht mit genau der Physik des Spiels einen Weg zum Ausgang. `MAP=1` zeichnet den
+  gefundenen Weg in die Karte, `CPS=1` prüft zusätzlich ab jeder Checkpoint-Fahne.
+- `HUMAN=1` lässt den Bot wie ein ordentlicher Mensch spielen statt perfekt: keine Gnadenframes an Kanten, jeder
+  Sprung mindestens 5 Frames vor der Kante, Landung mit mindestens 4 px Fuß auf der Plattform, Gefahren 2 px größer.
+  `tools/check.sh` verlangt, dass jede Etage so schaffbar ist – vom Start und von jedem Checkpoint.
+- `tools/window.js` misst für Sprünge ohne Dash, wie viele Frames Spielraum beim Absprung bleiben.
