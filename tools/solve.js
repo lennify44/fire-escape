@@ -23,6 +23,7 @@ function footing(R, s) {
   const p = s.p, y = p.y + E.K.ph, r = Math.floor(y / 16);
   let n = 0;
   for (let x = p.x; x < p.x + E.K.pw; x++) { const t = E.tile(R, s, Math.floor(x / 16), r); if (t === 1 || t === 2) n++; }
+  if (p.pl >= 0) { const b = E.platsAt(R, s.f)[p.pl]; n = Math.max(n, Math.min(p.x + E.K.pw, b.x + b.w) - Math.max(p.x, b.x)); }
   return n;
 }
 const [which = 'all', kArg = '3', maxArg = '1500000', wArg = '3'] = ARGV;
@@ -39,10 +40,10 @@ class Heap {
   get size() { return this.a.length; }
 }
 
-function distField(R) {
+// Tile distance (through anything that isn't a plain wall) from every tile to the target rectangle
+function distField(R, ex) {
   const d = new Float32Array(E.COLS * E.ROWS).fill(1e9), q = [];
-  const ex = R.exit;
-  for (let r = ex.y / 16; r < (ex.y + ex.h) / 16; r++) for (let c = ex.x / 16; c < (ex.x + ex.w) / 16; c++) { d[r * E.COLS + c] = 0; q.push(r * E.COLS + c); }
+  for (let r = Math.floor(ex.y / 16); r < (ex.y + ex.h) / 16; r++) for (let c = Math.floor(ex.x / 16); c < (ex.x + ex.w) / 16; c++) { d[r * E.COLS + c] = 0; q.push(r * E.COLS + c); }
   for (let h = 0; h < q.length; h++) {
     const i = q[h], c = i % E.COLS, r = (i / E.COLS) | 0;
     for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -58,6 +59,7 @@ function distField(R) {
 
 const BASE = [];
 for (const x of [-1, 0, 1]) for (const jump of [false, true]) BASE.push({ x, y: 0, jump, dash: false });
+const WAIT = { x: 0, y: 0, jump: false, dash: false, frames: 15 }; // stand still through a beat or a saw pass
 const DASHES = [];
 for (const y of [-1, 0, 1]) for (const x of [-1, 0, 1]) if (x || y) DASHES.push({ x, y, jump: false, dash: true });
 
@@ -66,38 +68,63 @@ function key(R, s) {
   let k = (p.x >> 1) + ',' + (p.y >> 1) + ',' + Math.round(p.vx / 20) + ',' + Math.round(p.vy / 30) + ',' + p.dash + p.dt + ',' + p.fo + (p.co ? 'c' : '') + (p.jb ? 'b' : '') + (p.pj ? 'j' : '') + (p.cut ? 'u' : '');
   for (const v of s.cr) k += v ? (v <= E.K.crumble ? 'a' : 'g' + ((v - E.K.crumble) / 40 | 0)) : '.';
   for (const v of s.ob) k += v ? 'x' + (v / 50 | 0) : 'o';
-  if (R.period > 1) k += '@' + ((s.f % R.period) / 6 | 0);
-  return k;
+  // time matters when things move; breaker rooms use coarser buckets so waiting for a beat stays affordable
+  if (R.period > 1) k += '@' + ((s.f % R.period) / (R.toggles ? 15 : 6) | 0);
+  return k + (s.got ? 'K' : '') + (p.pl >= 0 ? 'P' + p.pl : '');
 }
 
 function solve(idx, cp = -1) {
-  const def = LEVELS[idx], R = E.buildRoom(def), dist = distField(R);
-  const h = s => {
+  const def = LEVELS[idx], R = E.buildRoom(def), dist = distField(R, R.exit);
+  // HAT=1: only a clear that picked up the gold hard hat on the way counts
+  const wantHat = GLib.getenv('HAT') && R.hat, hatDist = wantHat && distField(R, R.hat);
+  const hatToExit = wantHat && dist[Math.floor((R.hat.y + 5) / 16) * E.COLS + Math.floor((R.hat.x + 5) / 16)];
+  if (GLib.getenv('HAT') && !R.hat) { print(`${idx + 1}. ${def.name}: no hat on this floor`); return true; }
+  // Waypoints (via) steer the search along the intended route: h = distance to the next one + the rest of the chain.
+  const via = (!wantHat && def.via) || [];
+  const viaDist = via.map(([c, r]) => distField(R, { x: c * 16, y: r * 16, w: 16, h: 16 }));
+  const rest = via.map((_, i) => { let sum = 0; for (let j = i; j < via.length; j++) { const [c, r] = via[j + 1] || []; sum += j + 1 < via.length ? viaDist[j + 1][via[j][1] * E.COLS + via[j][0]] : dist[via[j][1] * E.COLS + via[j][0]]; } return sum; });
+  const h = (s, wp = via.length) => {
     const c = Math.floor((s.p.x + 5) / 16), r = Math.floor((s.p.y + 7) / 16);
     if (r >= E.ROWS || r < 0) return 1e6;
-    return dist[r * E.COLS + c];
+    if (wp < via.length) return viaDist[wp][r * E.COLS + c] + rest[wp];
+    return wantHat && !s.got ? hatDist[r * E.COLS + c] + hatToExit : dist[r * E.COLS + c];
   };
-  const root = { s: E.initState(R, cp), g: 0, parent: null, act: null };
-  root.f = h(root.s) * W;
-  const open = new Heap(), seen = new Set([key(R, root.s)]);
+  const nextWp = (s, wp) => {
+    while (wp < via.length) {
+      const c = Math.floor((s.p.x + 5) / 16), r = Math.floor((s.p.y + 7) / 16);
+      if (r < 0 || r >= E.ROWS || viaDist[wp][r * E.COLS + c] > 1) break;
+      wp++;
+    }
+    return wp;
+  };
+  const root = { s: E.initState(R, cp), g: 0, parent: null, act: null, wp: 0 };
+  let wp0 = 0;
+  if (cp >= 0 && via.length) {
+    const ck = R.checks[cp], i0 = Math.floor((ck.sy + 7) / 16) * E.COLS + Math.floor((ck.sx + 5) / 16);
+    via.forEach((_, i) => { if (viaDist[i][i0] < viaDist[wp0][i0]) wp0 = i; });
+  }
+  root.wp = nextWp(root.s, wp0);
+  root.f = h(root.s, root.wp) * W;
+  const open = new Heap(), seen = new Set([key(R, root.s) + '#' + root.wp]);
   open.push(root);
   let n = 0, goal = null, best = 1e9, bestNode = root;
   const t0 = Date.now();
   while (open.size && n < MAX) {
     const node = open.pop(); n++;
-    const acts = !globalThis.NODASH && node.s.p.dash && !node.s.p.dt ? BASE.concat(DASHES) : BASE;
+    let acts = !globalThis.NODASH && node.s.p.dash && !node.s.p.dt ? BASE.concat(DASHES) : BASE;
+    if (R.period > 1 && node.s.p.g) acts = acts.concat([WAIT]);
     for (const a of acts) {
       const s = E.cloneState(node.s);
       let res = 0;
-      for (let k = 0; k < KF && !res; k++) res = E.step(R, s, a);
+      for (let k = 0; k < (a.frames || KF) && !res; k++) res = E.step(R, s, a);
       if (res === E.DEAD) continue;
       if (LAND && (s.ev & E.EV.LAND) && footing(R, s) < LAND) continue;
-      const child = { s, g: node.g + 1, parent: node, act: a };
-      if (res === E.WIN) { goal = child; break; }
-      const kk = key(R, s);
+      const child = { s, g: node.g + 1, parent: node, act: a, wp: nextWp(s, node.wp) };
+      if (res === E.WIN) { if (wantHat && !s.got) continue; goal = child; break; }
+      const kk = key(R, s) + '#' + child.wp;
       if (seen.has(kk)) continue;
       seen.add(kk);
-      const hv = h(s);
+      const hv = h(s, child.wp);
       if (hv >= 1e6) continue;
       if (hv < best) { best = hv; bestNode = child; }
       child.f = child.g + hv * W;
@@ -106,7 +133,7 @@ function solve(idx, cp = -1) {
     if (goal) break;
   }
   const ms = Date.now() - t0;
-  const label = `${idx + 1}. ${def.name}${cp >= 0 ? ' from checkpoint ' + (cp + 1) : ''}`;
+  const label = `${idx + 1}. ${def.name}${cp >= 0 ? ' from checkpoint ' + (cp + 1) : ''}${wantHat ? ' with hat' : ''}`;
   if (!goal) {
     const bp = bestNode.s.p;
     print(`${label}: NOT SOLVED after ${n} nodes (${ms} ms), got furthest at column ${Math.floor((bp.x + 5) / 16)}, row ${Math.floor((bp.y + 7) / 16)}`);
@@ -123,7 +150,7 @@ function solve(idx, cp = -1) {
   // replay to verify and trace the route
   const s = E.initState(R, cp), trail = new Set();
   let res = 0, frames = 0;
-  for (const a of acts) for (let k = 0; k < KF && !res; k++) {
+  for (const a of acts) for (let k = 0; k < (a.frames || KF) && !res; k++) {
     res = E.step(R, s, a); frames++;
     trail.add(Math.floor((s.p.y + 7) / 16) * E.COLS + Math.floor((s.p.x + 5) / 16));
   }

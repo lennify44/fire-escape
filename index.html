@@ -19,6 +19,7 @@
     --hivis: #f6c21c;
     --exit: #2fd46b;
     --rust: #e0592c;
+    --gold: #e8a317;
     --line: #2c313c;
     --sheet: rgba(11, 13, 17, 0.9);
     --display: "Saira Stencil One", Impact, "Arial Narrow", sans-serif;
@@ -83,6 +84,16 @@
   .floors td.fl { font-family: var(--display); font-size: 17px; width: 3em; }
   .floors .skip { margin-left: 0.6em; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--hivis); }
   .floors .bar { height: 6px; background: var(--rust); border-radius: 1px; min-width: 1px; }
+  .hat-tag { display: inline-block; font: 700 10px var(--body); letter-spacing: 0.14em; text-transform: uppercase; color: #1d1404; background: var(--gold); border-radius: 2px; padding: 0 4px; }
+  #floors .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  #floors h3 { margin: 6px 0 0; font: 600 12px var(--body); letter-spacing: 0.24em; text-transform: uppercase; color: var(--dim); }
+  .floor-card { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 4px; border: 1px solid var(--line); background: #171a20; color: var(--paper); font: 400 14px var(--body); letter-spacing: 0; text-transform: none; cursor: pointer; }
+  .floor-card .n { font-family: var(--display); font-size: 26px; line-height: 1; }
+  .floor-card .meta { display: flex; gap: 8px; align-items: center; font: 500 12px var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; min-height: 16px; }
+  .floor-card:disabled { opacity: 0.35; cursor: default; }
+  .floor-card:not(:disabled):hover { border-color: var(--hivis); filter: none; }
+  #f-msg { color: var(--exit); font: 500 14px var(--mono); }
+  #hud .stats .hats b { color: var(--gold); }
   .table-wrap { overflow-x: auto; }
 
   /* Touch: the left half of the screen is a floating stick, the right half is Jump with a Dash target inside it.
@@ -131,7 +142,7 @@
       <canvas id="c" width="640" height="368" aria-label="Game view"></canvas>
       <div id="hud">
         <div class="where"><span class="fl" id="h-fl">12</span><span id="h-name">Roof Access</span></div>
-        <div class="stats"><span class="deaths">Deaths <b id="h-d">0</b></span><span>Time <b id="h-t">0:00.00</b></span></div>
+        <div class="stats"><span class="hats">Hats <b id="h-h">0</b></span><span class="deaths">Deaths <b id="h-d">0</b></span><span>Time <b id="h-t">0:00.00</b></span></div>
       </div>
       <div id="card"><div class="t" id="card-t">Floor</div><div class="n" id="card-n">12</div></div>
       <div id="hint"></div>
@@ -150,9 +161,9 @@
 
 <section class="sheet" id="title">
   <div class="inner">
-    <div class="kicker">12 floors &middot; 1 way out</div>
+    <div class="kicker">24 floors &middot; 1 way out</div>
     <h1>Fire<br><span class="sign">Escape</span></h1>
-    <p>The tower is coming down tonight and you are still on the top floor. Each floor has one green exit sign. Touch a spike, a saw or the drop and you go back to the last checkpoint flag. <strong>You will die a lot.</strong></p>
+    <p>The tower is coming down tonight and you are still on the top floor. Get down twelve floors, then out through the basement. Each floor has one green exit sign and one gold hard hat hidden somewhere. Touch a spike, a saw or the drop and you go back to the last checkpoint flag. <strong>You will die a lot.</strong></p>
     <dl class="keys touch-keys">
       <dt><kbd>Left half</kbd></dt><dd>Put your thumb down anywhere and slide to run. Slide clearly up or down as well to aim the dash diagonally.</dd>
       <dt><kbd>Right half</kbd></dt><dd>Tap anywhere to jump; hold for height. Press it against a wall to kick off.</dd>
@@ -169,9 +180,24 @@
     <div class="row">
       <button id="b-continue" hidden>Continue</button>
       <button id="b-new">Start run</button>
+      <button class="ghost" id="b-floors">Floors</button>
     </div>
     <div class="best" id="t-best"></div>
     <p class="fine"><span class="kb-only">Gamepads work too. </span>Every floor has been cleared by a bot playing on this exact physics, so every floor can be done.</p>
+  </div>
+</section>
+
+<section class="sheet" id="floors" hidden>
+  <div class="inner">
+    <div class="kicker">Practice</div>
+    <h2>Floors</h2>
+    <p>Play any floor you have reached on its own. Best times and gold hard hats count here too.</p>
+    <div id="f-msg" hidden></div>
+    <h3>Tower</h3>
+    <div class="grid" id="f-tower"></div>
+    <h3>Basement</h3>
+    <div class="grid" id="f-base"></div>
+    <div class="row"><button class="ghost" id="b-floors-back">Back</button></div>
   </div>
 </section>
 
@@ -191,16 +217,17 @@
 
 <section class="sheet" id="end" hidden>
   <div class="inner">
-    <div class="kicker">Street level</div>
+    <div class="kicker">Riverbank</div>
     <h2>You got out.</h2>
     <div class="totals">
       <div><span>Time</span><b id="e-time">0:00.00</b></div>
+      <div><span>Hard hats</span><b id="e-hats">0</b></div>
       <div class="d"><span>Deaths</span><b id="e-deaths">0</b></div>
     </div>
     <div class="best" id="e-best"></div>
     <div class="table-wrap">
       <table class="floors">
-        <thead><tr><th>Floor</th><th></th><th class="num">Deaths</th><th class="num">Time</th><th style="width:30%"></th></tr></thead>
+        <thead><tr><th>Floor</th><th></th><th></th><th class="num">Deaths</th><th class="num">Time</th><th style="width:30%"></th></tr></thead>
         <tbody id="e-rows"></tbody>
       </table>
     </div>
@@ -224,26 +251,33 @@ const Engine = (() => {
     spring: -500,
     crumble: 30, crumbleBack: 110, orbBack: 150,
     sawR: 6,
+    belt: 75, fanV: 175, fanAcc: 1500, toggle: 90,
     hz: 0, // extra hazard reach in px; tools/solve.js raises it to test for slack
     edge: 0, // bot only: a jump must leave this many frames before running out of ground
   };
   const DEAD = 1, WIN = 2;
-  const EV = { JUMP: 1, WALL: 2, DASH: 4, LAND: 8, SPRING: 16, ORB: 32, CRUMBLE: 64, SUPER: 128, CHECK: 256 };
+  const EV = { JUMP: 1, WALL: 2, DASH: 4, LAND: 8, SPRING: 16, ORB: 32, CRUMBLE: 64, SUPER: 128, CHECK: 256, HAT: 512, TOGGLE: 1024 };
 
   const gcd = (a, b) => b ? gcd(b, a % b) : a;
   const approach = (v, t, d) => v < t ? Math.min(v + d, t) : Math.max(v - d, t);
   const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
   // Map legend: # wall  - scaffold (jump through)  = crumbling plank  ^ v < > spikes
-  // o saw  * dash refill  T spring  S start  C checkpoint  E exit
+  // o saw  * dash refill  T spring  S start  C checkpoint  E exit  K gold hard hat
+  // { } conveyor belt pushing left / right  F fan (blows up until the next solid tile)
+  // R B breaker blocks, solid in turns. Tile codes: 1 solid, 2 scaffold, 3 crumble, 6 red, 7 blue.
   function buildRoom(def) {
-    const g = new Uint8Array(COLS * ROWS), cid = new Int16Array(COLS * ROWS).fill(-1);
-    const R = { def, g, cid, canDash: def.dash !== false, spikes: [], statics: [], movers: def.saws || [], orbs: [], springs: [], crumbles: [], checks: [], exit: null, start: null, period: 1 };
+    const g = new Uint8Array(COLS * ROWS), cid = new Int16Array(COLS * ROWS).fill(-1), belt = new Int8Array(COLS * ROWS);
+    const R = { def, g, cid, belt, canDash: def.dash !== false, spikes: [], statics: [], movers: def.saws || [], plats: def.plats || [], orbs: [], springs: [], crumbles: [], checks: [], fans: [], winds: [], hat: null, toggles: false, exit: null, start: null, period: 1 };
     for (let r = 0; r < ROWS; r++) {
       const line = def.map[r] || '';
       for (let c = 0; c < COLS; c++) {
         const ch = line[c] || ' ', i = r * COLS + c, x = c * TS, y = r * TS;
         if (ch === '#') g[i] = 1;
+        else if (ch === '{' || ch === '}') { g[i] = 1; belt[i] = ch === '{' ? -1 : 1; }
+        else if (ch === 'F') { g[i] = 1; R.fans.push({ c, r }); }
+        else if (ch === 'R' || ch === 'B') { g[i] = ch === 'R' ? 6 : 7; R.toggles = true; }
+        else if (ch === 'K') R.hat = { x: x + 3, y: y + 4, w: 10, h: 10 };
         else if (ch === '-') g[i] = 2;
         else if (ch === '=') g[i] = 3;
         else if (ch === '^') R.spikes.push({ x: x + 3, y: y + 11, w: 10, h: 5, d: 0, c, r });
@@ -268,23 +302,50 @@ const Engine = (() => {
       while (c2 < COLS && g[r * COLS + c2] === 3) cid[r * COLS + c2++] = id;
       R.crumbles.push({ x: c * TS, y: r * TS, w: (c2 - c) * TS, h: TS });
     }
-    for (const m of R.movers) R.period = R.period * m.t / gcd(R.period, m.t);
+    for (const f of R.fans) {
+      let top = f.r;
+      while (top > 0 && g[(top - 1) * COLS + f.c] !== 1) top--;
+      if (top < f.r) R.winds.push({ x: f.c * TS + 2, y: top * TS, w: TS - 4, h: (f.r - top) * TS });
+    }
+    const lcm = t => { R.period = R.period * t / gcd(R.period, t); };
+    for (const m of R.movers) lcm(m.t);
+    for (const m of R.plats) lcm(m.t);
+    if (R.toggles) lcm(K.toggle * 2);
     return R;
   }
 
-  // cp: index into R.checks to respawn at, or -1 for the floor's start
-  function initState(R, cp = -1) {
+  // cp: index into R.checks to respawn at, or -1 for the floor's start; got: the hat was already picked up
+  function initState(R, cp = -1, got = false) {
     const c = R.checks[cp], s = c ? { x: c.sx, y: c.sy } : R.start;
     return {
-      f: 0, ev: 0, cp: c ? cp : -1,
-      p: { x: s.x, y: s.y, rx: 0, ry: 0, vx: 0, vy: 0, face: 1, dash: R.canDash ? 1 : 0, dt: 0, dx: 0, dy: 0, fo: 0, co: 0, jb: 0, cut: false, pj: true, pd: true, g: true, ws: 0 },
+      f: 0, ev: 0, cp: c ? cp : -1, got,
+      p: { x: s.x, y: s.y, rx: 0, ry: 0, vx: 0, vy: 0, face: 1, dash: R.canDash ? 1 : 0, dt: 0, dx: 0, dy: 0, fo: 0, co: 0, jb: 0, cut: false, pj: true, pd: true, g: true, ws: 0, pl: -1 },
       cr: R.crumbles.map(() => 0), ob: R.orbs.map(() => 0),
     };
   }
 
   function cloneState(s) {
-    return { f: s.f, ev: s.ev, cp: s.cp, p: { ...s.p }, cr: s.cr.slice(), ob: s.ob.slice() };
+    return { f: s.f, ev: s.ev, cp: s.cp, got: s.got, p: { ...s.p }, cr: s.cr.slice(), ob: s.ob.slice() };
   }
+
+  // Moving platforms: jump-through boards on a rail. {a:[c,r], b:[c,r], t, w (tiles, default 3), ph}
+  // Positions are whole pixels so riding them stays exact.
+  function platsAt(R, f) {
+    if (R._pf === f) return R._pp;
+    R._pf = f;
+    return R._pp = R.plats.map(m => {
+      const u = ((f / m.t + (m.ph || 0)) % 1 + 1) % 1, k = u < 0.5 ? u * 2 : 2 - u * 2;
+      return { x: Math.round((m.a[0] + (m.b[0] - m.a[0]) * k) * TS), y: Math.round((m.a[1] + (m.b[1] - m.a[1]) * k) * TS), w: (m.w || 3) * TS };
+    });
+  }
+  function platUnder(R, s, p, dx = 0) {
+    if (!R.plats.length) return -1;
+    const b = p.y + K.ph, pl = platsAt(R, s.f);
+    for (let i = 0; i < pl.length; i++) if (b === pl[i].y && p.x + dx + K.pw > pl[i].x && p.x + dx < pl[i].x + pl[i].w) return i;
+    return -1;
+  }
+  // Breaker blocks swap every K.toggle frames: red is solid on even beats, blue on odd ones.
+  const redOn = f => (Math.floor(f / K.toggle) & 1) === 0;
 
   // Saw centres at frame f. Movers: {a:[c,r], b:[c,r], t} ping-pong along a rail,
   // or {o:[c,r], rad, t, n} n saws orbiting a hub; t is the period in frames.
@@ -311,6 +372,8 @@ const Engine = (() => {
     if (r >= ROWS) return 0;
     const t = R.g[r * COLS + c];
     if (t === 3) return s.cr[R.cid[r * COLS + c]] > K.crumble ? 0 : 1;
+    if (t === 6) return redOn(s.f) ? 1 : 0;
+    if (t === 7) return redOn(s.f) ? 0 : 1;
     return t;
   }
   function solid(R, s, x, y, w, h) {
@@ -326,8 +389,11 @@ const Engine = (() => {
     for (let c = Math.floor(p.x / TS); c <= c1; c++) if (tile(R, s, c, b / TS) === 2) return true;
     return false;
   }
+  function onGround(R, s, p) {
+    return p.vy >= 0 && (solid(R, s, p.x, p.y + 1, K.pw, K.ph) || scaffoldBelow(R, s, p) || platUnder(R, s, p) >= 0);
+  }
   function groundAt(R, s, p, dx) {
-    if (solid(R, s, p.x + dx, p.y + 1, K.pw, K.ph)) return true;
+    if (solid(R, s, p.x + dx, p.y + 1, K.pw, K.ph) || platUnder(R, s, p, dx) >= 0) return true;
     const b = p.y + K.ph;
     if (b % TS) return false;
     const c1 = Math.floor((p.x + dx + K.pw - 1) / TS);
@@ -352,9 +418,23 @@ const Engine = (() => {
     p.ry -= n;
     const d = Math.sign(n);
     for (; n; n -= d) {
-      if (solid(R, s, p.x, p.y + d, K.pw, K.ph) || (d > 0 && scaffoldBelow(R, s, p))) { p.vy = 0; p.ry = 0; return; }
+      if (solid(R, s, p.x, p.y + d, K.pw, K.ph) || (d > 0 && (scaffoldBelow(R, s, p) || platUnder(R, s, p) >= 0))) { p.vy = 0; p.ry = 0; return; }
       p.y += d;
     }
+  }
+  // Move by whole pixels without touching velocity (riding platforms and belts)
+  function nudge(R, s, p, dx, dy) {
+    for (let d = Math.sign(dx); dx; dx -= d) { if (solid(R, s, p.x + d, p.y, K.pw, K.ph)) break; p.x += d; }
+    for (let d = Math.sign(dy); dy; dy -= d) { if (solid(R, s, p.x, p.y + d, K.pw, K.ph)) break; p.y += d; }
+  }
+  function inWind(R, p) {
+    for (const w of R.winds) if (p.x < w.x + w.w && p.x + K.pw > w.x && p.y < w.y + w.h && p.y + K.ph > w.y) return true;
+    return false;
+  }
+  function beltUnder(R, s, p) {
+    const r = Math.floor((p.y + K.ph) / TS), c = Math.floor((p.x + K.pw / 2) / TS);
+    if (r < 0 || r >= ROWS || (p.y + K.ph) % TS) return 0;
+    return R.belt[r * COLS + c] || R.belt[r * COLS + Math.floor(p.x / TS)] || R.belt[r * COLS + Math.floor((p.x + K.pw - 1) / TS)];
   }
 
   // inp: {x:-1|0|1, y:-1|0|1, jump:bool, dash:bool} as currently held. Returns 0, DEAD or WIN.
@@ -368,14 +448,24 @@ const Engine = (() => {
       s.cr[i] = v;
     }
     for (let i = 0; i < s.ob.length; i++) if (s.ob[i]) s.ob[i]--;
+    if (R.toggles && s.f % K.toggle === 0) s.ev |= EV.TOGGLE;
+
+    // ride the platform we stood on last frame
+    if (p.pl >= 0) {
+      const now = platsAt(R, s.f)[p.pl], was = platsAt(R, s.f - 1)[p.pl];
+      nudge(R, s, p, now.x - was.x, now.y - was.y);
+      platsAt(R, s.f);
+    }
 
     const jp = inp.jump && !p.pj, dp = inp.dash && !p.pd;
     p.pj = inp.jump; p.pd = inp.dash;
     if (jp) p.jb = K.buffer; else if (p.jb) p.jb--;
 
     const wasGround = p.g;
-    const ground = p.vy >= 0 && (solid(R, s, p.x, p.y + 1, K.pw, K.ph) || scaffoldBelow(R, s, p));
+    const ground = onGround(R, s, p), wind = R.winds.length && !p.dt && inWind(R, p);
     if (ground) { p.co = K.coyote; if (!p.dt && R.canDash) p.dash = 1; } else if (p.co) p.co--;
+    const bd = ground && beltUnder(R, s, p);
+    if (bd) moveX(R, s, p, bd * K.belt * DT);
     if (inp.x) p.face = inp.x;
     p.ws = 0;
 
@@ -406,7 +496,8 @@ const Engine = (() => {
       }
       let maxFall = K.maxFall;
       if (!ground && inp.x && p.vy > 0 && solid(R, s, p.x + inp.x, p.y, K.pw, K.ph)) { maxFall = K.slide; p.ws = inp.x; }
-      p.vy = approach(p.vy, maxFall, K.grav * (inp.jump && Math.abs(p.vy) < K.apex ? 0.5 : 1) * DT);
+      if (wind) { p.vy = approach(p.vy, -K.fanV, K.fanAcc * DT); p.cut = false; }
+      else p.vy = approach(p.vy, maxFall, K.grav * (inp.jump && Math.abs(p.vy) < K.apex ? 0.5 : 1) * DT);
       if (p.cut) {
         if (p.vy >= 0) p.cut = false;
         else if (!inp.jump) { p.vy = Math.max(p.vy, K.cut); p.cut = false; }
@@ -430,8 +521,10 @@ const Engine = (() => {
     moveY(R, s, p, p.vy * DT);
 
     const box = { x: p.x, y: p.y, w: K.pw, h: K.ph };
-    p.g = p.vy >= 0 && (solid(R, s, p.x, p.y + 1, K.pw, K.ph) || scaffoldBelow(R, s, p));
+    p.g = onGround(R, s, p);
+    p.pl = p.g ? platUnder(R, s, p) : -1;
     if (p.g && !wasGround) s.ev |= EV.LAND;
+    if (R.hat && !s.got && hit(box, R.hat)) { s.got = true; s.ev |= EV.HAT; }
 
     if (s.cr.length) {
       const c1 = Math.floor((p.x + K.pw) / TS), r1 = Math.floor((p.y + K.ph) / TS);
@@ -453,6 +546,7 @@ const Engine = (() => {
     for (let i = 0; i < R.checks.length; i++) if (i !== s.cp && hit(box, R.checks[i])) { s.cp = i; s.ev |= EV.CHECK; }
 
     if (p.y > RH + 4) return DEAD;
+    if (solid(R, s, p.x, p.y, K.pw, K.ph)) return DEAD; // a breaker block switched on inside you
     const m = K.hz, hb = m ? { x: p.x - m, y: p.y - m, w: K.pw + 2 * m, h: K.ph + 2 * m } : box;
     for (const sp of R.spikes) if (hit(hb, sp)) return DEAD;
     for (const sw of sawsAt(R, s.f)) {
@@ -463,7 +557,7 @@ const Engine = (() => {
     return 0;
   }
 
-  return { TS, COLS, ROWS, RW, RH, DT, K, DEAD, WIN, EV, buildRoom, initState, cloneState, sawsAt, step, tile };
+  return { TS, COLS, ROWS, RW, RH, DT, K, DEAD, WIN, EV, buildRoom, initState, cloneState, sawsAt, platsAt, redOn, step, tile };
 })();
 /*END ENGINE*/
 </script>
@@ -489,7 +583,7 @@ const LEVELS = [
       "##                                    ##",
       "##                               ##   ##",
       "##                               vv   ##",
-      "##                                    ##",
+      "##                K                   ##",
       "##                                  ####",
       "##                                    ##",
       "## S                              C   ##",
@@ -501,7 +595,7 @@ const LEVELS = [
     map: [
       "########################################",
       "##################                    ##",
-      "##################                    ##",
+      "##################          K         ##",
       "##################                   E##",
       "##################>   C              E##",
       "##################>  #####    ##    ####",
@@ -535,7 +629,7 @@ const LEVELS = [
       "##                   ###              ##",
       "##      vvvvvvvvv    ###              ##",
       "##                   ###              ##",
-      "##                   ###              ##",
+      "##          K        ###              ##",
       "##                   ###              ##",
       "##E                  vvv              ##",
       "##E               C  ^^^              ##",
@@ -557,7 +651,7 @@ const LEVELS = [
       "##E                                   ##",
       "##E                          C        ##",
       "#####   =     =      =     #####      ##",
-      "#####                      #####      ##",
+      "#####      K               #####      ##",
       "#####^^^^^^^^^^^^^^^^^^^^^^#####      ##",
       "################################      ##",
       "################################      ##",
@@ -586,7 +680,7 @@ const LEVELS = [
       "##E       o ^^^ o ^^^ o ^^^ o   C    ###",
       "##################################   ###",
       "##################################   ###",
-      "##################################   ###",
+      "##################################  K###",
       "##################################   ###",
       "##################################   ###",
       "##################################   ###",
@@ -611,7 +705,7 @@ const LEVELS = [
       "##################################  ####",
       "##vvvvvvvvvvvvvv##vvvvvvvv##vvvvvv    ##",
       "##              ##        ##      *   ##",
-      "##              ##        ##          ##",
+      "##              ##   K    ##          ##",
       "##              ##        ##          ##",
       "##            * ##        ##          ##",
       "##              vv      * ##    *   C ##",
@@ -639,7 +733,7 @@ const LEVELS = [
       "########################################",
       "##################################    ##",
       "##vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv    ##",
-      "##                                    ##",
+      "##                  K                 ##",
       "##E                                   ##",
       "##E   ^^^^^T^^^^^T^^^^^T^^^^^T^^ C    ##",
       "##################################    ##",
@@ -667,7 +761,7 @@ const LEVELS = [
       "##                ------        ------##",
       "##                                    ##",
       "##          C                         ##",
-      "##       -------         ------       ##",
+      "##       -------         ------    K  ##",
       "##                                    ##",
       "##                                    ##",
       "##------                              ##",
@@ -696,7 +790,7 @@ const LEVELS = [
       "#####################  ##########   <###",
       "#####################> ##########   <###",
       "#####################> ##########   <###",
-      "#####################  ##########    ###",
+      "#####################  ########## K  ###",
       "#####################  ##########>   ###",
       "#####################  ##########>   ###",
       "##     vvv     vvv     ##########    ###",
@@ -723,7 +817,7 @@ const LEVELS = [
       "#####           =        *            ##",
       "#####                                 ##",
       "#####             ^^                  ##",
-      "#####             ##                  ##",
+      "#####        K    ##                  ##",
       "#####             ##                  ##",
       "#####             ##                  ##",
       "#####             ##                  ##",
@@ -749,7 +843,7 @@ const LEVELS = [
       "################################  *   ##",
       "##vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv      ##",
       "##                                    ##",
-      "##                                    ##",
+      "##                      K             ##",
       "##                                    ##",
       "##                                    ##",
       "## S     T     T     T     T     C    ##",
@@ -764,7 +858,7 @@ const LEVELS = [
       "##                    #######         ##",
       "##                    #######    C    ##",
       "##                    #######   ##    ##",
-      "##                    #######   ##   <##",
+      "##    K               #######   ##   <##",
       "##                    #######   ##   <##",
       "##                    #######   ##    ##",
       "##                    #######   ##    ##",
@@ -782,6 +876,318 @@ const LEVELS = [
       "## S                 T           C    ##",
       "######^^^^^^^^^^^^^^^#^^^^^^^^^#########",
       "########################################"
+    ] },
+  { floor: "B1", name: "Loading Dock", hint: "The street door is chained shut. Down through the basement. Belts push you around while you stand on them.",
+    map: [
+      "########################################",
+      "########################################",
+      "##            vvvvvvvvvvvvvv          ##",
+      "##E                                   ##",
+      "##E                            C      ##",
+      "######}}}}}}}    {{{{{{{{    #####    ##",
+      "#############^^^^########^^^^#####    ##",
+      "##################################    ##",
+      "####################################  ##",
+      "##################################    ##",
+      "##################################    ##",
+      "##################################  ####",
+      "##################################    ##",
+      "##    vvvvvvvvvvvvvvvvvvvvvvvv        ##",
+      "##                                ##  ##",
+      "##               K                    ##",
+      "##                                    ##",
+      "##                                  ####",
+      "##                                    ##",
+      "## S                            C     ##",
+      "#######}}}}}}}}     {{{{{{{{   #########",
+      "###############^^^^^########^^^#########",
+      "########################################"
+    ] },
+  { floor: "B2", name: "Parking Level", hint: "Ride the yellow lifts. You can jump up through them.", plats: [{"a":[7,17],"b":[14,17],"t":240},{"a":[18,18],"b":[18,7],"t":240,"ph":0.5},{"a":[27,9],"b":[31,9],"t":240}], via: [[10,16],[19,10],[24,8],[29,8],[36,8]],
+    map: [
+      "########################################",
+      "########################################",
+      "##    vvvvvvvvvvvvvvvvvvvvvvvvvvvvv   ##",
+      "##                                    ##",
+      "##                  K                 ##",
+      "##                                    ##",
+      "##                                    ##",
+      "##                                   E##",
+      "##                      C            E##",
+      "##                     ###         #####",
+      "##                     ###         #####",
+      "##                                 #####",
+      "##                                 #####",
+      "##                                 #####",
+      "##                                 #####",
+      "##                                 #####",
+      "##                                 #####",
+      "## S                               #####",
+      "######                             #####",
+      "######                             #####",
+      "######                             #####",
+      "######   ^^^^^                     #####",
+      "######   #####                     #####"
+    ] },
+  { floor: "B3", name: "Boiler Room", hint: "Fans blow you up. Dash across an updraft before it lifts you into trouble.",
+    map: [
+      "########################################",
+      "########################################",
+      "##         vvvvv      vvvvv           ##",
+      "##E                                   ##",
+      "##E                         C         ##",
+      "############   ########   #####       ##",
+      "############^F^########^F^#####       ##",
+      "###############################       ##",
+      "###############################       ##",
+      "##############################        ##",
+      "##############################        ##",
+      "##############################        ##",
+      "##############################        ##",
+      "##  K                C        #       ##",
+      "##                  ####      #       ##",
+      "##         ####     ####      #>      ##",
+      "##         ####               #>      ##",
+      "##                            #       ##",
+      "##                                    ##",
+      "## S                                  ##",
+      "#######   ######   ######     #       ##",
+      "#######^F^######^F^######^^^^^###FF#####",
+      "########################################"
+    ] },
+  { floor: "B4", name: "Breaker Room", hint: "Pink and blue blocks take turns being solid. Listen for the click.",
+    map: [
+      "########################################",
+      "########################################",
+      "##          R      B      R           ##",
+      "##E         R      B      R           ##",
+      "##E         R      B      R  C        ##",
+      "#######   ####   ####   ########      ##",
+      "#######^^^####^^^####^^^########      ##",
+      "################################ RR   ##",
+      "################################      ##",
+      "################################      ##",
+      "##                                 BB ##",
+      "##                                  K ##",
+      "##                                C   ##",
+      "##                              ########",
+      "##                          RR  ########",
+      "##                     BB       ########",
+      "##                RR            ########",
+      "##           BB                 ########",
+      "## S    RR                      ########",
+      "######                          ########",
+      "######                          ########",
+      "######                          ########",
+      "######^^^^^^^^^^^^^^^^^^^^^^^^^^########"
+    ] },
+  { floor: "B5", name: "Freight Elevator", hint: "Every lift runs on the same clock. Miss one and wait for the next trip.", saws: [{"o":[21,2.2],"rad":1.2,"t":120,"n":1},{"a":[10,11],"b":[27,11],"t":240}], plats: [{"a":[6,19],"b":[6,6],"t":240},{"a":[15,6],"b":[24,6],"t":240},{"a":[30,6],"b":[30,17],"t":240,"ph":0.5}], via: [[7,17],[12,5],[16,5],[22,5],[31,5],[31,16]],
+    map: [
+      "########################################",
+      "########################################",
+      "##vvvvvvv                   vvvvvvvvvv##",
+      "##                             K      ##",
+      "##                                    ##",
+      "##          C                         ##",
+      "##         ####                       ##",
+      "##         ####                       ##",
+      "##         vvvv^^                     ##",
+      "##             ##                     ##",
+      "##             ##                     ##",
+      "##             ##                     ##",
+      "##             ##                     ##",
+      "##             ##                     ##",
+      "##             ##                     ##",
+      "##             ##                     ##",
+      "##             ##                     ##",
+      "##             ##                     ##",
+      "##             ##                    E##",
+      "## S           ##                    E##",
+      "#####          ##                #######",
+      "#####^^^^^^^^^^##^^^^^^^^^^^^^^^^#######",
+      "########################################"
+    ] },
+  { floor: "B6", name: "Laundry", hint: "Belts feed you into the saws. Jump before the belt decides for you.", saws: [{"a":[5,4],"b":[28,4],"t":240}],
+    map: [
+      "########################################",
+      "########################################",
+      "##                                    ##",
+      "##                                    ##",
+      "##               K                    ##",
+      "##E                                   ##",
+      "##E                          C        ##",
+      "######}}}}}}}}  =  =  {{{{{{{{{{      ##",
+      "##############^^^^^^^^##########      ##",
+      "################################      ##",
+      "################################   == ##",
+      "################################      ##",
+      "################################      ##",
+      "##vvvv    vvvvvvvvvvvvvvvvvvvvvv==    ##",
+      "##                                    ##",
+      "##                                    ##",
+      "##                                 == ##",
+      "##                                    ##",
+      "##                                    ##",
+      "## S       o        o           C     ##",
+      "######}}}}}}}}}}{{{{{{{{{{    ##########",
+      "##########################^^^^##########",
+      "########################################"
+    ] },
+  { floor: "B7", name: "Air Handling", hint: "Ride the air up and leave through the side door before the spikes on top.",
+    map: [
+      "########################################",
+      "########################################",
+      "#####vvvv#####vvvv#####vvvv#############",
+      "#####>  <#####>  <#####>  <#############",
+      "#####>  <#####>  <##C##>  <#############",
+      "#####>  <#####             #############",
+      "#####>  <#####             #############",
+      "#####>  <#####>  <#####>  <####       ##",
+      "#####>  <#####>  <#####>  <####       ##",
+      "#####>  <#####>  <#####              E##",
+      "#####>  <#####>  <#####              E##",
+      "#####>  <#####>  <#####>  <#############",
+      "#####>  <##C##>  <#####>  <#############",
+      "#####             #####>  <#############",
+      "#####             #####>  <#############",
+      "#####>  <#####>  <#####>  <#############",
+      "#####>  <#####>  <#####>  <#############",
+      "#####   <#####>           <#############",
+      "##      <#####>           <#############",
+      "##      <#####>     K     <#############",
+      "## S     #####             #############",
+      "######FF#######FF#######FF##############",
+      "########################################"
+    ] },
+  { floor: "B8", name: "Cold Storage", hint: "Time the spring so the block above you is open.",
+    map: [
+      "########################################",
+      "########################################",
+      "##                                    ##",
+      "##E                                   ##",
+      "##E                         C         ##",
+      "########   R    B    R     ###        ##",
+      "########^^^^^^^^^^^^^^^^^^^###        ##",
+      "##############################        ##",
+      "##############################        ##",
+      "##############################        ##",
+      "##                                    ##",
+      "########   #####   #####   ###        ##",
+      "##      RRR     BBB     RRR           ##",
+      "##                              RR    ##",
+      "##               K                    ##",
+      "##                                    ##",
+      "##                                 BB ##",
+      "##                                    ##",
+      "##                                    ##",
+      "## S   ^^T^^   ^^T^^   ^^T^^      C   ##",
+      "########################################",
+      "########################################",
+      "########################################"
+    ] },
+  { floor: "B9", name: "Server Room", hint: "The belt drags you back while you wait for the next beat.", via: [[20,18],[34,18],[34,9],[25,6],[10,6]],
+    map: [
+      "########################################",
+      "########################################",
+      "##        vvvvvvvvvvvvvvvvvvvvvv      ##",
+      "##                                    ##",
+      "##                                    ##",
+      "##E                                   ##",
+      "##E                          C        ##",
+      "############RBRBRBR#}}}}}}}}}}}}      ##",
+      "############^^^^^^^#############      ##",
+      "################################      ##",
+      "################################   BB ##",
+      "#####################vvvvvvvvvvv      ##",
+      "#####################                 ##",
+      "#####################           RR    ##",
+      "#####################     K           ##",
+      "#####################                 ##",
+      "##   ################              BB ##",
+      "##        R    B           *          ##",
+      "##        R    B                      ##",
+      "## S      R    B                      ##",
+      "#####{{{{{{{{{{{{{{{{##         ########",
+      "#######################^^^^^^^^^########",
+      "########################################"
+    ] },
+  { floor: "B10", name: "Sewer Access", hint: "The updraft does not stop at the spikes. You have to.", saws: [{"o":[27,11],"rad":2,"t":120,"n":2}], plats: [{"a":[7,12],"b":[14,12],"t":240},{"a":[20,16],"b":[20,6],"t":240},{"a":[24,6],"b":[29,6],"t":240}], via: [[10,11],[18,14],[22,12],[21,5],[27,5],[35,7]],
+    map: [
+      "########################################",
+      "########################################",
+      "##    vvvvvvvvvvvvvvvvvvvvvvvvvvv     ##",
+      "##                                    ##",
+      "##                K                   ##",
+      "##                                    ##",
+      "##                                   E##",
+      "##                                   E##",
+      "##                               #######",
+      "##                               #######",
+      "##                               #######",
+      "## S                             #######",
+      "######                C          #######",
+      "######                ##         #######",
+      "######                           #######",
+      "######                           #######",
+      "######                           #######",
+      "######                           #######",
+      "######                           #######",
+      "######                           #######",
+      "######                           #######",
+      "######                           #######",
+      "######            F              #######"
+    ] },
+  { floor: "B11", name: "Pump Station", hint: "Belts, breakers, fans, lifts and saws, all on one floor.", saws: [{"a":[5,4],"b":[28,4],"t":240}], plats: [{"a":[21,18],"b":[27,18],"t":240}], via: [[11,18],[16,15],[18,15],[24,17],[33,19],[35,5],[28,6],[5,6]],
+    map: [
+      "########################################",
+      "########################################",
+      "##                              vvvvvv##",
+      "##                                    ##",
+      "##                                    ##",
+      "##E                                   ##",
+      "##E                          C        ##",
+      "######## ==  ==  ##{{{{{{{{{####      ##",
+      "########^^^^^^^^^###############      ##",
+      "################################      ##",
+      "################################      ##",
+      "################################      ##",
+      "################################      ##",
+      "################################      ##",
+      "##  vvvvvvvvvv     vvvvvvvvvvvvv      ##",
+      "##                                    ##",
+      "##                ==                  ##",
+      "##           R                        ##",
+      "##           R                       K##",
+      "## S         R                   C    ##",
+      "####}}}}}}}}}##               #####F####",
+      "###############^F^^^^^^^^^^^^^##########",
+      "########################################"
+    ] },
+  { floor: "B12", name: "Outfall", hint: "The river is on the other side. One more floor.", saws: [{"o":[19,11],"rad":1.5,"t":120,"n":2}], plats: [{"a":[27,15],"b":[9,15],"t":240,"w":3}], via: [[10,20],[23,19],[36,20],[36,13],[18,14],[4,14],[3,5],[12,5],[24,5],[35,6]],
+    map: [
+      "########################################",
+      "########################################",
+      "##     vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv##",
+      "##                                    ##",
+      "##               *     *              ##",
+      "##                                   E##",
+      "##          T                        E##",
+      "##  #########              RR   ########",
+      "##  #########^^^^^^^^^^^^^^^^^^^########",
+      "##  ####################################",
+      "##                                    ##",
+      "##                  K                 ##",
+      "##                                    ##",
+      "##                                    ##",
+      "##  C                                 ##",
+      "########                       ####   ##",
+      "########^^^^^^^^^^^^^^^^^^^^^^^####>  ##",
+      "###################################   ##",
+      "##                            B  R    ##",
+      "##                            B  R    ##",
+      "## S    o     =   =           B  R  C ##",
+      "##  }}}}}}}                           ##",
+      "############^^^^^^^^^#^F^###############"
     ] }
 ];
 /*END LEVELS*/
@@ -806,10 +1212,11 @@ const LEVELS = [
     board: '#8d6a3f', boardDk: '#5b4227', tube: '#7a818c',
     skin: '#e2ae84', hair: '#2a211d', hood: '#e3e9f1', hoodDk: '#9eaaba', pants: '#2d3547', shoe: '#0f1116',
     spent: '#5f7196', paper: '#ebe7df',
+    gold: '#e8a317', goldDk: '#94640a', goldHi: '#ffe7a0', red: '#e0457b', blue: '#3d8fe6',
   };
 
   // ---------- storage (optional: private windows can refuse it) ----------
-  const SAVE = 'fire-escape-run-v1', BEST = 'fire-escape-best-v1';
+  const SAVE = 'fire-escape-run-v1', BEST = 'fire-escape-best-v2', PROG = 'fire-escape-progress-v1';
   const load = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
   const store = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
@@ -865,6 +1272,17 @@ const LEVELS = [
     g.fillText('FL', RW / 2 - (Rm.def.floor.length > 1 ? 150 : 95), RH / 2 - 62);
     g.restore();
 
+    // fan updrafts, platform rails
+    for (const w of Rm.winds) {
+      const grd = g.createLinearGradient(0, w.y + w.h, 0, w.y);
+      grd.addColorStop(0, 'rgba(170,215,255,0.09)'); grd.addColorStop(1, 'rgba(170,215,255,0)');
+      g.fillStyle = grd; g.fillRect(w.x - 2, w.y, w.w + 4, w.h);
+    }
+    for (const m of Rm.plats) {
+      const half = (m.w || 3) * TS / 2;
+      g.strokeStyle = '#2a2f39'; g.lineWidth = 2; g.setLineDash([3, 3]);
+      g.beginPath(); g.moveTo(m.a[0] * TS + half, m.a[1] * TS + 3); g.lineTo(m.b[0] * TS + half, m.b[1] * TS + 3); g.stroke(); g.setLineDash([]);
+    }
     // saw rails and hubs sit behind the concrete
     for (const m of Rm.movers) {
       if (m.o) {
@@ -882,8 +1300,22 @@ const LEVELS = [
     }
 
     const solidAt = (c, r) => c < 0 || c >= COLS || r < 0 || (r < ROWS && Rm.g[r * COLS + c] === 1) || r >= ROWS;
+    const fanAt = new Set(Rm.fans.map(f => f.r * COLS + f.c));
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
       const t = Rm.g[r * COLS + c], x = c * TS, y = r * TS;
+      if (Rm.belt[r * COLS + c]) {
+        g.fillStyle = '#20242b'; g.fillRect(x, y, TS, TS);
+        g.fillStyle = '#3a404b'; g.fillRect(x, y + 4, TS, TS - 6);
+        g.fillStyle = '#626a77'; g.fillRect(x + 2, y + 7, 4, 4); g.fillRect(x + 10, y + 7, 4, 4);
+        g.fillStyle = '#14171c'; g.fillRect(x, y, TS, 4);
+        continue;
+      }
+      if (fanAt.has(r * COLS + c)) {
+        g.fillStyle = '#2a2f37'; g.fillRect(x, y, TS, TS);
+        g.fillStyle = '#5f6672'; g.fillRect(x, y, TS, 2); g.fillRect(x, y, 1, TS); g.fillRect(x + TS - 1, y, 1, TS);
+        g.fillStyle = '#16191e'; for (let k = 4; k < TS; k += 3) g.fillRect(x + 2, y + k, TS - 4, 1);
+        continue;
+      }
       if (t === 1) {
         const up = solidAt(c, r - 1), dn = solidAt(c, r + 1), lf = solidAt(c - 1, r), rt = solidAt(c + 1, r);
         const inner = up && dn && lf && rt && solidAt(c - 1, r - 1) && solidAt(c + 1, r - 1);
@@ -1030,6 +1462,71 @@ const LEVELS = [
     });
   }
 
+  // Basement machinery
+  function roomExtras(Rm) {
+    if (Rm._x) return Rm._x;
+    const belts = [], toggles = [];
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      const i = r * COLS + c;
+      if (Rm.belt[i]) belts.push({ x: c * TS, y: r * TS, d: Rm.belt[i] });
+      if (Rm.g[i] === 6 || Rm.g[i] === 7) toggles.push({ x: c * TS, y: r * TS, red: Rm.g[i] === 6 });
+    }
+    return Rm._x = { belts, toggles };
+  }
+  function drawMachines() {
+    const X = roomExtras(R);
+    ctx.fillStyle = '#6b7280';
+    for (const b of X.belts) {
+      const off = ((tick * K.belt / 60 * b.d) % 8 + 8) % 8;
+      for (let k = 0; k < 2; k++) ctx.fillRect(b.x + Math.floor((off + k * 8) % 16), b.y + 1, 3, 2);
+    }
+    for (const f of R.fans) {
+      const w = Math.round(Math.abs(Math.cos(tick * 0.45)) * 12) + 1;
+      ctx.fillStyle = '#9aa2ad'; ctx.fillRect(f.c * TS + 8 - w / 2, f.r * TS + 2, w, 1);
+    }
+    ctx.fillStyle = 'rgba(200,230,255,0.22)';
+    for (const w of R.winds) for (let k = 0; k < 6; k++) {
+      const yy = w.y + w.h - ((tick * 2.6 + k * w.h / 6) % w.h);
+      ctx.fillRect(w.x + 1 + (k * 5) % (w.w - 2), Math.round(yy), 1, 5);
+    }
+    if (X.toggles.length) {
+      const red = Engine.redOn(S.f), warn = K.toggle - S.f % K.toggle <= 24, blink = (tick >> 2) & 1;
+      for (const b of X.toggles) {
+        const on = b.red === red, col = b.red ? C.red : C.blue;
+        if (on) {
+          ctx.fillStyle = col; ctx.fillRect(b.x, b.y, TS, TS);
+          ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fillRect(b.x, b.y, TS, 2);
+          ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(b.x, b.y + TS - 2, TS, 2); ctx.fillRect(b.x + 6, b.y + 6, 4, 4);
+          if (warn && blink) { ctx.fillStyle = 'rgba(10,12,16,0.45)'; ctx.fillRect(b.x, b.y, TS, TS); }
+        } else {
+          ctx.globalAlpha = warn ? (blink ? 0.95 : 0.5) : 0.32; ctx.strokeStyle = col; ctx.lineWidth = 1;
+          ctx.strokeRect(b.x + 0.5, b.y + 0.5, TS - 1, TS - 1);
+          if (warn) { ctx.fillStyle = col; ctx.globalAlpha *= 0.3; ctx.fillRect(b.x, b.y, TS, TS); }
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+    for (const b of Engine.platsAt(R, S.f)) {
+      ctx.fillStyle = '#2a2f38'; ctx.fillRect(b.x + 3, b.y + 5, 2, 3); ctx.fillRect(b.x + b.w - 5, b.y + 5, 2, 3);
+      ctx.fillStyle = '#4b525e'; ctx.fillRect(b.x, b.y, b.w, 6);
+      ctx.fillStyle = C.hivis; ctx.fillRect(b.x, b.y, b.w, 2);
+      ctx.fillStyle = '#1c1a12'; for (let k = 2; k < b.w - 2; k += 6) ctx.fillRect(b.x + k, b.y, 3, 2);
+    }
+  }
+  function hatShape(x, y) {
+    ctx.fillStyle = C.gold; ctx.fillRect(x + 2, y + 1, 6, 4); ctx.fillRect(x + 3, y, 4, 1); ctx.fillRect(x, y + 5, 10, 2);
+    ctx.fillStyle = C.goldHi; ctx.fillRect(x + 3, y + 1, 2, 2);
+    ctx.fillStyle = C.goldDk; ctx.fillRect(x + 5, y + 1, 1, 4); ctx.fillRect(x, y + 6, 10, 1);
+  }
+  function drawHat() {
+    if (!R.hat || S.got) return;
+    const h = R.hat, cx = h.x + 5, cy = h.y + 5, by = Math.round(Math.sin(tick * 0.07) * 1.5);
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 14);
+    glow.addColorStop(0, 'rgba(232,163,23,0.35)'); glow.addColorStop(1, 'rgba(232,163,23,0)');
+    ctx.fillStyle = glow; ctx.fillRect(cx - 14, cy - 14, 28, 28);
+    hatShape(h.x, h.y + 2 + by);
+  }
+
   function drawExitGlow() {
     const e = R.exit, cx = e.x + e.w / 2, cy = e.y + 3, a = 0.18 + Math.sin(tick * 0.05) * 0.05;
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 34);
@@ -1077,6 +1574,7 @@ const LEVELS = [
     ctx.fillStyle = C.hair; ctx.fillRect(2, 0, 6, 2); ctx.fillRect(2, 2, 2, 3);
     ctx.fillStyle = band; ctx.fillRect(2, 2, 6, 1);
     ctx.fillStyle = '#1a1512'; ctx.fillRect(6, 3, 1, 1);
+    if (S.got) { ctx.fillStyle = C.gold; ctx.fillRect(3, -1, 5, 2); ctx.fillRect(1, 1, 9, 1); ctx.fillStyle = C.goldHi; ctx.fillRect(4, -1, 1, 1); }
     if (dashing) { ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(0, 0, 10, 14); }
     ctx.restore();
     ctx.globalAlpha = 1;
@@ -1099,11 +1597,13 @@ const LEVELS = [
     ctx.setTransform(1, 0, 0, 1, Math.round((Math.random() * 2 - 1) * sh), Math.round((Math.random() * 2 - 1) * sh));
     ctx.drawImage(statics[ri], 0, 0);
     drawExitGlow();
+    drawMachines();
     drawChecks();
     drawCrumbles();
     drawSprings();
     drawOrbs();
     drawSaws();
+    drawHat();
     drawPlayer();
     drawParts();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1149,6 +1649,8 @@ const LEVELS = [
     }
     if (ev & EV.ORB) { burst(p.x + 5, p.y + 7, 14, [C.hivis, '#fff'], 2.2); sfx('orb'); }
     if (ev & EV.CRUMBLE) sfx('crack');
+    if (ev & EV.HAT) { burst(R.hat.x + 5, R.hat.y + 5, 18, [C.gold, C.goldHi, '#fff'], 2.2); sfx('hat'); }
+    if (ev & EV.TOGGLE) sfx('click');
     if (ev & EV.CHECK) { const c = R.checks[S.cp]; burst(c.x + 9, c.y + TS * 2 - 13, 10, C.exit, 1.4); sfx('check'); }
     if ((p.dt || Math.abs(p.vx) > K.run + 40) && tick % 2 === 0) ghosts.push({ x: p.x, y: p.y, life: 14 });
     if (ev & EV.SUPER) { burst(p.x + 5, p.y + 14, 12, [C.hivis, '#fff3c4'], 2, 0.5); shake = Math.max(shake, 3); sfx('super'); }
@@ -1193,6 +1695,8 @@ const LEVELS = [
       case 'super': tone('square', 330, 990, 0.14, 0.06); hiss(0.12, 0.12, 2200, 0.8); break;
       case 'check': tone('square', 523, 523, 0.08, 0.05); tone('square', 784, 784, 0.12, 0.05, 0.08); break;
       case 'crack': hiss(0.12, 0.12, 900, 3); break;
+      case 'hat': [784, 988, 1175, 1568].forEach((f, i) => tone('triangle', f, f, 0.12, 0.07, i * 0.06)); break;
+      case 'click': tone('square', 1400, 1400, 0.02, 0.025); break;
       case 'die': hiss(0.35, 0.35, 700, 0.6); tone('square', 160, 40, 0.3, 0.08); break;
       case 'exit': [523, 659, 784, 1047].forEach((f, i) => tone('square', f, f, 0.1, 0.05, i * 0.07)); break;
     }
@@ -1342,22 +1846,46 @@ const LEVELS = [
   // ---------- flow ----------
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   function show(id) {
-    for (const s of ['title', 'pause', 'end']) $(s).hidden = s !== id;
+    for (const s of ['title', 'pause', 'end', 'floors']) $(s).hidden = s !== id;
     document.body.classList.toggle('menu', !!id);
   }
 
+  function normRun(r) {
+    if (!r || !Array.isArray(r.deaths) || !(r.room >= 0 && r.room <= LAST)) return null;
+    for (const k of ['deaths', 'frames', 'skipped', 'hats']) {
+      const a = Array.isArray(r[k]) ? r[k] : [];
+      r[k] = rooms.map((_, i) => a[i] ?? (k === 'skipped' || k === 'hats' ? false : 0));
+    }
+    return r;
+  }
+
+  // Progress across runs and practice: furthest floor reached, hats found, best time per floor
+  function loadProg() {
+    const p = load(PROG) || {}, saved = normRun(load(SAVE));
+    return {
+      reached: Math.min(LAST, Math.max(p.reached | 0, saved ? saved.room : 0)),
+      hats: rooms.map((_, i) => !!(p.hats && p.hats[i])),
+      best: rooms.map((_, i) => (p.best && p.best[i]) || null),
+    };
+  }
+  let prog = loadProg();
+  const saveProg = () => store(PROG, prog);
+  const hatCount = () => prog.hats.filter(Boolean).length;
+  const label = r => (/^B/.test(r.def.floor) ? '' : 'FL ') + r.def.floor;
+
   function enterRoom(i) {
+    if (i > prog.reached) { prog.reached = i; saveProg(); }
     run.room = i; R = rooms[i]; S = Engine.initState(R);
     statics[i] ||= buildStatic(i);
     parts.length = ghosts.length = tail.length = 0; springT.length = 0;
     cardT = 90; hintT = 420; deadT = winT = 0;
     $('card-t').textContent = R.def.name;
-    $('card-n').innerHTML = 'FL <span>' + R.def.floor + '</span>';
+    $('card-n').innerHTML = (/^B/.test(R.def.floor) ? '' : 'FL ') + '<span>' + R.def.floor + '</span>';
     $('hint').textContent = R.def.hint;
     document.body.classList.toggle('nodash', !R.canDash);
     hud(true); save();
   }
-  function respawn(fromStart) { S = Engine.initState(R, fromStart ? -1 : S.cp); tail.length = 0; ghosts.length = 0; squash = 1; }
+  function respawn(fromStart) { S = Engine.initState(R, fromStart ? -1 : S.cp, fromStart ? false : S.got); tail.length = 0; ghosts.length = 0; squash = 1; }
   function die() {
     const p = S.p;
     burst(p.x + 5, p.y + 7, 22, [C.hood, C.hoodDk, C.skin, p.dash ? C.hivis : C.spent, C.rust], 2.6, 1, 34, 2);
@@ -1372,8 +1900,21 @@ const LEVELS = [
     run.deaths[run.room]++;
     respawn(fromStart); hud(true);
   }
-  function win() { winT = 40; sfx('exit'); burst(S.p.x + 5, S.p.y + 7, 16, C.exit, 1.6); }
+  function win() {
+    winT = 40; sfx('exit'); burst(S.p.x + 5, S.p.y + 7, 16, C.exit, 1.6);
+    const i = run.room, b = prog.best[i];
+    if (S.got) { run.hats[i] = true; prog.hats[i] = true; }
+    if (!b || run.frames[i] < b.t) prog.best[i] = { t: run.frames[i], d: run.deaths[i] };
+    if (i < LAST) prog.reached = Math.max(prog.reached, i + 1);
+    saveProg(); hud(true);
+  }
   function nextRoom() {
+    if (run.practice) {
+      const i = run.room;
+      mode = 'title';
+      openFloors(`Cleared ${label(rooms[i])} in ${fmt(run.frames[i])} with ${run.deaths[i]} ${run.deaths[i] === 1 ? 'death' : 'deaths'}${run.hats[i] ? ', hat included' : ''}.`);
+      return;
+    }
     if (run.room === LAST) return finish();
     enterRoom(run.room + 1);
   }
@@ -1386,19 +1927,40 @@ const LEVELS = [
   }
 
   function newRun() {
-    run = { room: 0, deaths: rooms.map(() => 0), frames: rooms.map(() => 0), skipped: rooms.map(() => false) };
+    run = normRun({ room: 0, deaths: [] });
     enterRoom(0); play();
   }
+  function practice(i) {
+    run = normRun({ room: i, deaths: [] }); run.practice = true;
+    enterRoom(i); play();
+  }
+  function openFloors(msg) {
+    $('f-msg').hidden = !msg; $('f-msg').textContent = msg || '';
+    const card = (r, i) => {
+      const b = prog.best[i], open = i <= prog.reached;
+      return `<button class="floor-card" data-i="${i}"${open ? '' : ' disabled'}><span class="n">${r.def.floor}</span><span>${open ? r.def.name : 'Locked'}</span>` +
+        `<span class="meta">${b ? fmt(b.t) : ''}${prog.hats[i] ? '<span class="hat-tag">Hat</span>' : ''}</span></button>`;
+    };
+    $('f-tower').innerHTML = rooms.map((r, i) => /^B/.test(r.def.floor) ? '' : card(r, i)).join('');
+    $('f-base').innerHTML = rooms.map((r, i) => /^B/.test(r.def.floor) ? card(r, i) : '').join('');
+    show('floors');
+  }
+  document.addEventListener('click', e => {
+    const b = e.target.closest('.floor-card');
+    if (b && !b.disabled) { audioOn(); practice(+b.dataset.i); }
+  });
   function play() { mode = 'play'; show(null); cv.focus?.(); }
   function pause() {
     if (mode !== 'play') return;
     mode = 'pause'; held.clear();
-    $('p-where').textContent = 'Floor ' + R.def.floor + ' · ' + R.def.name + ' · ' + run.deaths[run.room] + ' deaths here';
+    $('p-where').textContent = (run.practice ? 'Practice · ' : '') + label(R) + ' · ' + R.def.name + ' · ' + run.deaths[run.room] + ' deaths here';
+    $('b-skip').hidden = !!run.practice;
+    $('b-quit').textContent = run.practice ? 'Back to floors' : 'Save and quit';
     show('pause'); if (!document.body.classList.contains('touch')) $('b-resume').focus(); save();
   }
   function resume() { mode = 'play'; show(null); held.clear(); }
   function toggleMute() { muted = !muted; store('fire-escape-muted', muted); $('b-mute').textContent = 'Sound: ' + (muted ? 'off' : 'on'); }
-  function save() { if (run && mode !== 'end') store(SAVE, run); }
+  function save() { if (run && !run.practice && mode !== 'end') store(SAVE, run); }
 
   function finish() {
     mode = 'end';
@@ -1408,32 +1970,35 @@ const LEVELS = [
     if (isBest) store(BEST, { time: t, deaths: d });
     store(SAVE, null);
     $('e-time').textContent = fmt(t); $('e-deaths').textContent = d;
+    $('e-hats').textContent = run.hats.filter(Boolean).length + ' / ' + rooms.length;
     $('e-best').textContent = skipped
       ? skipped + (skipped === 1 ? ' floor' : ' floors') + ' skipped. Clear every floor to set a best time.'
       : isBest ? (best ? 'New best time. Previous: ' + fmt(best.time) : 'First clear. This is your time to beat.') : 'Best: ' + fmt(best.time) + ' with ' + best.deaths + ' deaths';
     const maxD = Math.max(1, ...run.deaths);
     $('e-rows').innerHTML = rooms.map((r, i) =>
-      `<tr><td class="fl">${r.def.floor}</td><td>${r.def.name}${run.skipped && run.skipped[i] ? '<span class="skip">skipped</span>' : ''}</td><td class="num">${run.deaths[i]}</td><td class="num">${fmt(run.frames[i])}</td><td><div class="bar" style="width:${run.deaths[i] / maxD * 100}%"></div></td></tr>`).join('');
+      `<tr><td class="fl">${r.def.floor}</td><td>${r.def.name}${run.skipped && run.skipped[i] ? '<span class="skip">skipped</span>' : ''}</td><td>${run.hats[i] ? '<span class="hat-tag">Hat</span>' : ''}</td><td class="num">${run.deaths[i]}</td><td class="num">${fmt(run.frames[i])}</td><td><div class="bar" style="width:${run.deaths[i] / maxD * 100}%"></div></td></tr>`).join('');
     show('end'); if (!document.body.classList.contains('touch')) $('b-again').focus();
     titleBest();
   }
 
   function titleBest() {
-    const best = load(BEST), saved = load(SAVE);
-    $('t-best').textContent = best ? 'Best run: ' + fmt(best.time) + ' · ' + best.deaths + ' deaths' : '';
-    const ok = saved && Array.isArray(saved.deaths) && saved.deaths.length === rooms.length && saved.room >= 0 && saved.room <= LAST;
+    const best = load(BEST), saved = normRun(load(SAVE)), hats = hatCount();
+    $('t-best').textContent = [best ? 'Best run: ' + fmt(best.time) + ' · ' + best.deaths + ' deaths' : '', hats ? 'Hard hats found: ' + hats + ' / ' + rooms.length : ''].filter(Boolean).join(' · ');
+    const ok = !!saved;
     $('b-continue').hidden = !ok;
-    if (ok) $('b-continue').textContent = 'Continue on floor ' + rooms[saved.room].def.floor + ' · ' + sum(saved.deaths) + ' deaths';
+    if (ok) $('b-continue').textContent = 'Continue on ' + label(rooms[saved.room]) + ' · ' + sum(saved.deaths) + ' deaths';
     $('b-new').classList.toggle('ghost', !!ok);
   }
 
   $('b-new').onclick = () => { audioOn(); newRun(); };
-  $('b-continue').onclick = () => { audioOn(); run = load(SAVE); enterRoom(run.room); play(); };
+  $('b-continue').onclick = () => { audioOn(); run = normRun(load(SAVE)); enterRoom(run.room); play(); };
+  $('b-floors').onclick = () => { audioOn(); openFloors(); };
+  $('b-floors-back').onclick = () => { mode = 'title'; titleBest(); show('title'); };
   $('b-resume').onclick = resume;
   $('b-restart').onclick = () => { resume(); restartRoom(true); };
   $('b-skip').onclick = skipRoom;
   $('b-mute').onclick = toggleMute;
-  $('b-quit').onclick = () => { save(); mode = 'title'; titleBest(); show('title'); };
+  $('b-quit').onclick = () => { if (run.practice) { mode = 'title'; openFloors(); return; } save(); mode = 'title'; titleBest(); show('title'); };
   $('b-again').onclick = () => { audioOn(); newRun(); };
   $('b-mute').textContent = 'Sound: ' + (muted ? 'off' : 'on');
 
@@ -1447,6 +2012,7 @@ const LEVELS = [
     $('h-fl').textContent = R.def.floor;
     $('h-name').textContent = R.def.name;
     $('h-d').textContent = sum(run.deaths);
+    $('h-h').textContent = hatCount() + '/' + rooms.length;
     $('h-t').textContent = fmt(t);
   }
 
@@ -1505,12 +2071,12 @@ const LEVELS = [
   // Viewer hot-reload: keep the run when the page is republished.
   window.claude?.hot?.snapshot?.(() => ({ run, mode: mode === 'play' ? 'pause' : mode }));
   function start(data) {
-    if (data && data.run && data.run.deaths && data.run.deaths.length === rooms.length) {
-      run = data.run; enterRoom(run.room);
+    if (data && normRun(data.run)) {
+      run = normRun(data.run); enterRoom(run.room);
       if (data.mode === 'pause') { mode = 'play'; pause(); } else { mode = 'title'; titleBest(); show('title'); }
     } else {
-      const saved = load(SAVE);
-      if (saved && saved.room >= 0 && saved.room <= LAST) { R = rooms[saved.room]; S = Engine.initState(R); }
+      const saved = normRun(load(SAVE));
+      if (saved) { R = rooms[saved.room]; S = Engine.initState(R); }
       titleBest(); show('title');
       if (!document.body.classList.contains('touch')) ($('b-continue').hidden ? $('b-new') : $('b-continue')).focus();
     }
