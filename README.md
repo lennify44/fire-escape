@@ -24,6 +24,9 @@ Alles steckt in einer einzigen Datei: `index.html` im Browser öffnen und losspi
 - **Goldene Bauhelme:** einer pro Etage, meist abseits des Wegs. Er zählt, wenn du damit den Ausgang erreichst.
 - **Etagen-Auswahl** auf dem Titelbildschirm: jede erreichte Etage einzeln üben, mit Bestzeit und Helm.
 - Fortschritt, Helme und Bestzeiten speichert der Browser (localStorage).
+- **Versteckter Entwickler-Modus:** fünfmal schnell auf den Titel „Fire Escape“ tippen (oder auf dem Titelbildschirm
+  `dev` tippen). Dann sind alle Etagen offen, im Pausenmenü gibt es „Skip floor“ auch beim Üben und
+  „Next checkpoint“, und **N** überspringt eine Etage. Nochmal fünfmal tippen schaltet ihn aus.
 
 ## Etagen
 

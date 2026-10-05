@@ -38,6 +38,7 @@
   #hud { position: absolute; inset: 0 0 auto 0; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: calc(5px * var(--s, 1)) calc(10px * var(--s, 1)); pointer-events: none; font-size: max(11px, calc(9px * var(--s, 1))); letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); text-shadow: 0 1px 0 #000; }
   #hud .where { display: flex; align-items: baseline; gap: 0.6em; min-width: 0; white-space: nowrap; overflow: hidden; }
   #hud .fl { font-family: var(--display); font-size: 1.5em; letter-spacing: 0.02em; color: var(--paper); }
+  body.dev #hud .where::before { content: "DEV"; align-self: center; font: 700 0.75em var(--mono); color: #15130c; background: var(--hivis); padding: 0 4px; border-radius: 2px; }
   #hud .stats { flex-shrink: 0; display: flex; gap: 1.2em; font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: 0; white-space: nowrap; }
   #hud .stats b { color: var(--paper); font-weight: 700; }
   #hud .stats .deaths b { color: var(--rust); }
@@ -209,6 +210,7 @@
       <button id="b-resume">Resume</button>
       <button class="ghost" id="b-restart">Restart floor</button>
       <button class="ghost" id="b-skip">Skip floor</button>
+      <button class="ghost" id="b-cp" hidden>Next checkpoint</button>
       <button class="ghost" id="b-mute">Sound: on</button>
       <button class="ghost" id="b-quit">Save and quit</button>
     </div>
@@ -730,16 +732,16 @@ const LEVELS = [
       "########################################",
       "########################################",
       "########################################",
-      "########################################",
-      "##################################    ##",
-      "##vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv    ##",
+      "##vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv######",
+      "##                                    ##",
+      "##                                    ##",
       "##                  K                 ##",
       "##E                                   ##",
       "##E   ^^^^^T^^^^^T^^^^^T^^^^^T^^ C    ##",
       "##################################    ##",
-      "##################################    ##",
-      "##################################    ##",
       "##vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv    ##",
+      "##                                    ##",
+      "##                                    ##",
       "##                                    ##",
       "##                                    ##",
       "## S  ^^T^^^^^T^^^^^T^^^^^T^^^^^ C T  ##",
@@ -1919,7 +1921,34 @@ const LEVELS = [
     enterRoom(run.room + 1);
   }
 
+  // Hidden dev mode: tap the title five times (or type "dev" on the title screen). Opens every floor,
+  // lets Skip work in practice too, adds "Next checkpoint" to the pause menu and N to skip a floor.
+  let dev = load('fire-escape-dev') === true, titleTaps = [], typed = '';
+  document.body.classList.toggle('dev', dev);
+  function setDev(on) {
+    dev = on; store('fire-escape-dev', on);
+    document.body.classList.toggle('dev', on);
+    titleBest();
+  }
+  $('title').querySelector('h1').addEventListener('pointerup', () => {
+    const now = performance.now();
+    titleTaps = titleTaps.filter(t => now - t < 2500).concat(now);
+    if (titleTaps.length >= 5) { titleTaps = []; setDev(!dev); }
+  });
+  addEventListener('keydown', e => {
+    if (mode === 'title' && e.key.length === 1) { typed = (typed + e.key.toLowerCase()).slice(-3); if (typed === 'dev') { typed = ''; setDev(!dev); } }
+    if (dev && mode === 'play' && e.code === 'KeyN' && !e.repeat) skipRoom();
+  });
+  function nextCheckpoint() {
+    resume();
+    if (R.checks.length) { S = Engine.initState(R, (S.cp + 1) % R.checks.length, S.got); tail.length = ghosts.length = 0; }
+  }
+
   function skipRoom() {
+    if (run.practice) {
+      if (run.room < LAST) practice(run.room + 1); else { mode = 'title'; openFloors(); }
+      return;
+    }
     if (!run.skipped) run.skipped = rooms.map(() => false);
     run.skipped[run.room] = true;
     mode = 'play'; show(null); held.clear();
@@ -1937,7 +1966,7 @@ const LEVELS = [
   function openFloors(msg) {
     $('f-msg').hidden = !msg; $('f-msg').textContent = msg || '';
     const card = (r, i) => {
-      const b = prog.best[i], open = i <= prog.reached;
+      const b = prog.best[i], open = dev || i <= prog.reached;
       return `<button class="floor-card" data-i="${i}"${open ? '' : ' disabled'}><span class="n">${r.def.floor}</span><span>${open ? r.def.name : 'Locked'}</span>` +
         `<span class="meta">${b ? fmt(b.t) : ''}${prog.hats[i] ? '<span class="hat-tag">Hat</span>' : ''}</span></button>`;
     };
@@ -1954,7 +1983,8 @@ const LEVELS = [
     if (mode !== 'play') return;
     mode = 'pause'; held.clear();
     $('p-where').textContent = (run.practice ? 'Practice · ' : '') + label(R) + ' · ' + R.def.name + ' · ' + run.deaths[run.room] + ' deaths here';
-    $('b-skip').hidden = !!run.practice;
+    $('b-skip').hidden = !!run.practice && !dev;
+    $('b-cp').hidden = !dev || !R.checks.length;
     $('b-quit').textContent = run.practice ? 'Back to floors' : 'Save and quit';
     show('pause'); if (!document.body.classList.contains('touch')) $('b-resume').focus(); save();
   }
@@ -1983,7 +2013,7 @@ const LEVELS = [
 
   function titleBest() {
     const best = load(BEST), saved = normRun(load(SAVE)), hats = hatCount();
-    $('t-best').textContent = [best ? 'Best run: ' + fmt(best.time) + ' · ' + best.deaths + ' deaths' : '', hats ? 'Hard hats found: ' + hats + ' / ' + rooms.length : ''].filter(Boolean).join(' · ');
+    $('t-best').textContent = [best ? 'Best run: ' + fmt(best.time) + ' · ' + best.deaths + ' deaths' : '', hats ? 'Hard hats found: ' + hats + ' / ' + rooms.length : '', dev ? 'Dev mode: every floor open, N skips a floor' : ''].filter(Boolean).join(' · ');
     const ok = !!saved;
     $('b-continue').hidden = !ok;
     if (ok) $('b-continue').textContent = 'Continue on ' + label(rooms[saved.room]) + ' · ' + sum(saved.deaths) + ' deaths';
@@ -1997,6 +2027,7 @@ const LEVELS = [
   $('b-resume').onclick = resume;
   $('b-restart').onclick = () => { resume(); restartRoom(true); };
   $('b-skip').onclick = skipRoom;
+  $('b-cp').onclick = nextCheckpoint;
   $('b-mute').onclick = toggleMute;
   $('b-quit').onclick = () => { if (run.practice) { mode = 'title'; openFloors(); return; } save(); mode = 'title'; titleBest(); show('title'); };
   $('b-again').onclick = () => { audioOn(); newRun(); };
