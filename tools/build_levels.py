@@ -12,7 +12,7 @@ for n, line in enumerate((root / 'tools/levels.txt').read_text().splitlines(), 1
         if 'nodash' in flags:
             cur['dash'] = False
         rooms.append(cur)
-    elif line.startswith(('saws:', 'plats:', 'via:')):
+    elif line.startswith(('saws:', 'plats:', 'via:', 'hatvia:')):
         key, val = line.split(':', 1)
         cur[key] = json.loads(val)
     elif len(cur['map']) < 23:
@@ -30,7 +30,7 @@ for r in rooms:
 
 def extras(r):
     out = ' dash: false,' if r.get('dash') is False else ''
-    for key in ('saws', 'plats', 'via'):
+    for key in ('saws', 'plats', 'via', 'hatvia'):
         if key in r:
             out += f' {key}: ' + json.dumps(r[key], separators=(',', ':')) + ','
     return out

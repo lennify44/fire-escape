@@ -5,6 +5,10 @@ Zwölf Etagen nach unten, und weil die Straßentür verkettet ist, danach zwölf
 Jede Etage hat genau ein grünes Notausgangsschild und einen versteckten goldenen Bauhelm.
 Stacheln, Sägen und der Abgrund schicken dich zurück zur letzten Checkpoint-Fahne.
 
+Oben auf dem Titelbildschirm lässt sich zu **Legacy** wechseln: zwölf weitere, deutlich schwerere Etagen (L1 bis L12)
+in den alten Werkshallen unter dem Turm, mit eigenem Spielstand, eigenen Bestzeiten und Helmen. Gedacht ist Legacy
+für nach dem Turm, gesperrt ist es aber nicht.
+
 Alles steckt in einer einzigen Datei: `index.html` im Browser öffnen und losspielen. Keine Installation, kein Build.
 
 ## Steuerung
@@ -23,6 +27,7 @@ Alles steckt in einer einzigen Datei: `index.html` im Browser öffnen und losspi
   Schräg nach unten in den Boden dashen und dann springen ergibt einen flacheren, schnelleren **Hyper**.
 - **Goldene Bauhelme:** einer pro Etage, meist abseits des Wegs. Er zählt, wenn du damit den Ausgang erreichst.
 - **Etagen-Auswahl** auf dem Titelbildschirm: jede erreichte Etage einzeln üben, mit Bestzeit und Helm.
+- **Tower / Legacy** oben auf dem Titelbildschirm wählt das Spiel; die Auswahl bleibt gespeichert.
 - Fortschritt, Helme und Bestzeiten speichert der Browser (localStorage).
 - **Versteckter Entwickler-Modus:** fünfmal schnell auf den Titel „Fire Escape“ tippen (oder auf dem Titelbildschirm
   `dev` tippen). Dann sind alle Etagen offen, im Pausenmenü gibt es „Skip floor“ auch beim Üben und
@@ -57,10 +62,31 @@ Alles steckt in einer einzigen Datei: `index.html` im Browser öffnen und losspi
 | B11 | Pump Station | alles auf einer Etage |
 | B12 | Outfall | Finale, drei Ebenen bis zum Fluss |
 
+### Legacy
+
+Jede Legacy-Etage mischt mehrere Mechaniken aus Turm und Keller, hat weniger Checkpoint-Fahnen und weniger Spielraum.
+
+| Etage | Name | Worum es geht |
+|---|---|---|
+| L1 | Foundry Gate | Bänder gegen dich, ein Schacht mit Stacheln, Stachel-Decke: nur halbe Sprünge |
+| L2 | Coal Chute | morsche Bretter, dann im Fallen an Sägen vorbei lenken, niedriger Tunnel mit Säge |
+| L3 | Pressure Line | Aufwind bis kurz vor die Stacheln, eine Säge fährt im Luftschacht auf und ab |
+| L4 | Turbine Hall | Lastenaufzüge mitten durch kreisende Sägen |
+| L5 | Cooling Tunnel | Schaltblock-Trittsteine unter Stacheln, Schaltblock-Schacht, flackernder Boden |
+| L6 | Kiln | nie den Boden berühren: Federn, einzelne morsche Bretter, Dash-Funken |
+| L7 | Rolling Mill | Super über lange Lücken, Sägen auf den Bändern, Gerüstschacht |
+| L8 | Sluice | drei Kamine mit Stacheln, Ventilatoren, ein morsches Brett als einziger Halt |
+| L9 | Old Generator | Schaltblöcke im eigenen Takt rund um einen Rotor aus Sägen |
+| L10 | Overflow | Bretter, Aufwind zwischen Sägen, Aufzug, dann an einem Sägenpaar vorbei hinunter |
+| L11 | Spillway | alles, zweimal |
+| L12 | Daylight | Finale, drei Ebenen bis an die Oberfläche: Band mit Säge, Aufzug unter zwei Rotoren, Feder unter Stacheln |
+
 ## Level bearbeiten
 
 Die Etagen stehen als ASCII-Karten (40 × 23 Kacheln) in `tools/levels.txt`; die Legende steht oben in der Datei.
-Die Kellergeschosse werden aus `tools/design/basement_*.py` erzeugt (Hilfsfunktionen statt Handarbeit).
+Die Kellergeschosse werden aus `tools/design/basement_*.py` erzeugt (Hilfsfunktionen statt Handarbeit), die
+Legacy-Etagen aus `tools/design/legacy_*.py`. Etagen, deren Name mit `L` beginnt, gehören zu Legacy, alle anderen
+zum Turm.
 Nach einer Änderung:
 
 ```sh
@@ -75,6 +101,15 @@ Die Werkzeuge laufen mit `gjs` (bei Fedora/GNOME dabei), Node wird nicht gebrauc
 - `HUMAN=1` lässt den Bot wie ein ordentlicher Mensch spielen statt perfekt: keine Gnadenframes an Kanten, jeder
   Sprung mindestens 5 Frames vor der Kante, Landung mit mindestens 4 px Fuß auf der Plattform, Gefahren 2 px größer.
   `tools/check.sh` verlangt, dass jede Etage so schaffbar ist – vom Start und von jedem Checkpoint.
+- **Nicht framegenau (`SLOP=2`, bei `HUMAN=1` automatisch an):** Jeder Tastendruck des Bots – springen, loslassen,
+  dashen, Richtung wechseln – wird zusätzlich 2 Frames zu früh und 2 Frames zu spät durchgespielt. Diese „schlampigen“
+  Kopien dürfen nach 8 Frames (eine Reaktionszeit) in der Luft nach links oder rechts nachsteuern, einen verpatzten
+  Sprung oder Dash aber nicht zurücknehmen. Erst wenn auch sie überleben und wieder sicher stehen, zählt der Zug.
+  Eine Stelle, die nur mit einem Fenster von 1–2 Frames klappt, fällt damit durch. `SLOP=0` schaltet das ab.
+- `CP=2` prüft eine Etage nur ab ihrer zweiten Checkpoint-Fahne.
+- `TIGHT=1` sucht ohne diese Schlampigkeit einen Weg und zählt danach jede Stelle auf, die sie nicht verträgt
+  (Zeit, Spalte, Zeile, welcher Tastendruck) – so findet man die framegenauen Stellen einer Etage.
 - `HAT=1` zählt nur Durchläufe, die unterwegs den goldenen Helm einsammeln.
 - `via:` in `levels.txt` gibt dem Bot Wegpunkte in der gedachten Reihenfolge; das Spiel ignoriert sie.
+  `hatvia:` macht dasselbe für den Lauf mit Helm (`HAT=1`); ohne `hatvia:` sucht der Bot den Helm ohne Wegpunkte.
 - `tools/window.js` misst für Sprünge ohne Dash, wie viele Frames Spielraum beim Absprung bleiben.

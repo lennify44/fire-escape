@@ -94,6 +94,12 @@
   .floor-card:disabled { opacity: 0.35; cursor: default; }
   .floor-card:not(:disabled):hover { border-color: var(--hivis); filter: none; }
   #f-msg { color: var(--exit); font: 500 14px var(--mono); }
+  #f-groups { display: grid; gap: 14px; }
+  .modes { display: flex; width: max-content; max-width: 100%; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .modes .mode { padding: 8px 18px; border: 0; border-radius: 0; background: transparent; color: var(--dim); font-size: 13px; }
+  .modes .mode + .mode { border-left: 1px solid var(--line); }
+  .modes .mode[aria-pressed="true"] { background: #1d2129; color: var(--paper); box-shadow: inset 0 -2px 0 var(--hivis); }
+  body.legacy #title h1 .sign { color: var(--gold); }
   #hud .stats .hats b { color: var(--gold); }
   .table-wrap { overflow-x: auto; }
 
@@ -162,9 +168,13 @@
 
 <section class="sheet" id="title">
   <div class="inner">
-    <div class="kicker">24 floors &middot; 1 way out</div>
-    <h1>Fire<br><span class="sign">Escape</span></h1>
-    <p>The tower is coming down tonight and you are still on the top floor. Get down twelve floors, then out through the basement. Each floor has one green exit sign and one gold hard hat hidden somewhere. Touch a spike, a saw or the drop and you go back to the last checkpoint flag. <strong>You will die a lot.</strong></p>
+    <div class="modes" role="group" aria-label="Game">
+      <button class="mode" data-game="main" aria-pressed="true">Tower</button>
+      <button class="mode" data-game="legacy" aria-pressed="false">Legacy</button>
+    </div>
+    <div class="kicker" id="t-kick">24 floors &middot; 1 way out</div>
+    <h1>Fire<br><span class="sign" id="t-sign">Escape</span></h1>
+    <p id="t-story">The tower is coming down tonight and you are still on the top floor. Get down twelve floors, then out through the basement. Each floor has one green exit sign and one gold hard hat hidden somewhere. Touch a spike, a saw or the drop and you go back to the last checkpoint flag. <strong>You will die a lot.</strong></p>
     <dl class="keys touch-keys">
       <dt><kbd>Left half</kbd></dt><dd>Put your thumb down anywhere and slide to run. Slide clearly up or down as well to aim the dash diagonally.</dd>
       <dt><kbd>Right half</kbd></dt><dd>Tap anywhere to jump; hold for height. Press it against a wall to kick off.</dd>
@@ -184,20 +194,17 @@
       <button class="ghost" id="b-floors">Floors</button>
     </div>
     <div class="best" id="t-best"></div>
-    <p class="fine"><span class="kb-only">Gamepads work too. </span>Every floor has been cleared by a bot playing on this exact physics, so every floor can be done.</p>
+    <p class="fine"><span class="kb-only">Gamepads work too. </span>Every floor has been cleared by a bot playing on this exact physics, and it is never frame perfect: each of its presses also works two frames early or late.</p>
   </div>
 </section>
 
 <section class="sheet" id="floors" hidden>
   <div class="inner">
-    <div class="kicker">Practice</div>
+    <div class="kicker" id="f-kick">Practice</div>
     <h2>Floors</h2>
     <p>Play any floor you have reached on its own. Best times and gold hard hats count here too.</p>
     <div id="f-msg" hidden></div>
-    <h3>Tower</h3>
-    <div class="grid" id="f-tower"></div>
-    <h3>Basement</h3>
-    <div class="grid" id="f-base"></div>
+    <div id="f-groups"></div>
     <div class="row"><button class="ghost" id="b-floors-back">Back</button></div>
   </div>
 </section>
@@ -219,8 +226,8 @@
 
 <section class="sheet" id="end" hidden>
   <div class="inner">
-    <div class="kicker">Riverbank</div>
-    <h2>You got out.</h2>
+    <div class="kicker" id="e-kick">Riverbank</div>
+    <h2 id="e-title">You got out.</h2>
     <div class="totals">
       <div><span>Time</span><b id="e-time">0:00.00</b></div>
       <div><span>Hard hats</span><b id="e-hats">0</b></div>
@@ -585,8 +592,8 @@ const LEVELS = [
       "##                                    ##",
       "##                               ##   ##",
       "##                               vv   ##",
-      "##                K                   ##",
-      "##                                  ####",
+      "##                                    ##",
+      "##                K                 ####",
       "##                                    ##",
       "## S                              C   ##",
       "#######    ##     #    ##      #########",
@@ -734,8 +741,8 @@ const LEVELS = [
       "########################################",
       "##vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv######",
       "##                                    ##",
-      "##                                    ##",
       "##                  K                 ##",
+      "##                                    ##",
       "##E                                   ##",
       "##E   ^^^^^T^^^^^T^^^^^T^^^^^T^^ C    ##",
       "##################################    ##",
@@ -818,8 +825,8 @@ const LEVELS = [
       "#####   =                             ##",
       "#####           =        *            ##",
       "#####                                 ##",
-      "#####             ^^                  ##",
-      "#####        K    ##                  ##",
+      "#####        K    ^^                  ##",
+      "#####             ##                  ##",
       "#####             ##                  ##",
       "#####             ##                  ##",
       "#####             ##                  ##",
@@ -1113,7 +1120,7 @@ const LEVELS = [
       "#######################^^^^^^^^^########",
       "########################################"
     ] },
-  { floor: "B10", name: "Sewer Access", hint: "The updraft does not stop at the spikes. You have to.", saws: [{"o":[27,11],"rad":2,"t":120,"n":2}], plats: [{"a":[7,12],"b":[14,12],"t":240},{"a":[20,16],"b":[20,6],"t":240},{"a":[24,6],"b":[29,6],"t":240}], via: [[10,11],[18,14],[22,12],[21,5],[27,5],[35,7]],
+  { floor: "B10", name: "Sewer Access", hint: "The updraft does not stop at the spikes. You have to.", saws: [{"o":[27,11],"rad":2,"t":120,"n":2}], plats: [{"a":[7,12],"b":[14,12],"t":240},{"a":[20,16],"b":[20,6],"t":240},{"a":[24,6],"b":[29,6],"t":240}], via: [[10,11],[18,14],[22,12],[21,9],[21,5],[27,5],[35,7]],
     map: [
       "########################################",
       "########################################",
@@ -1165,7 +1172,7 @@ const LEVELS = [
       "###############^F^^^^^^^^^^^^^##########",
       "########################################"
     ] },
-  { floor: "B12", name: "Outfall", hint: "The river is on the other side. One more floor.", saws: [{"o":[19,11],"rad":1.5,"t":120,"n":2}], plats: [{"a":[27,15],"b":[9,15],"t":240,"w":3}], via: [[10,20],[23,19],[36,20],[36,13],[18,14],[4,14],[3,5],[12,5],[24,5],[35,6]],
+  { floor: "B12", name: "Outfall", hint: "The river is on the other side. One more floor.", saws: [{"o":[19,11],"rad":1.5,"t":120,"n":2}], plats: [{"a":[27,15],"b":[9,15],"t":240,"w":3}], via: [[10,20],[23,19],[36,20],[36,13],[4,14],[3,10],[3,5],[12,5],[24,5],[35,6]], hatvia: [[10,20],[23,19],[36,20],[36,13],[20,11],[4,14],[3,10],[3,5],[12,5],[24,5],[35,6]],
     map: [
       "########################################",
       "########################################",
@@ -1190,6 +1197,318 @@ const LEVELS = [
       "## S    o     =   =           B  R  C ##",
       "##  }}}}}}}                           ##",
       "############^^^^^^^^^#^F^###############"
+    ] },
+  { floor: "L1", name: "Foundry Gate", hint: "The old works. Mind the ceiling: a full jump is too much up here.", via: [[17,18],[35,18],[34,11],[36,4],[29,4],[10,4],[3,5]],
+    map: [
+      "########################################",
+      "########################################",
+      "##vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv    ##",
+      "##                                    ##",
+      "##E                     K             ##",
+      "##E                         C         ##",
+      "#####}}}}}      {{{{{{      ######    ##",
+      "#####^^^^^^^^^^^#########^^^^######   ##",
+      "#################################>   <##",
+      "#################################>   <##",
+      "#################################    <##",
+      "#################################    <##",
+      "#################################--  <##",
+      "#################################>    ##",
+      "##    vvvvvvvvvvvvvvvvvvvvvvvv###>    ##",
+      "##                           v###>    ##",
+      "##                            ###     ##",
+      "##                            ###     ##",
+      "##                                    ##",
+      "## S                               C  ##",
+      "######{{{{{     ##     }}}}}   #########",
+      "###########^^^^^##^^^^^#####^^^#########",
+      "########################################"
+    ] },
+  { floor: "L2", name: "Coal Chute", hint: "Down the chute. Steer while you fall; the saws do not wait.", saws: [{"a":[26,10],"b":[29,10],"t":90},{"a":[29,15],"b":[26,15],"t":90,"ph":0.5},{"a":[8,19],"b":[16,19],"t":150}], via: [[22,5],[27,9],[27,16],[27,20],[13,20],[3,20]],
+    map: [
+      "########################################",
+      "########################################",
+      "##     vvvvvvvvvvvvvvvvv       #########",
+      "##                             #########",
+      "##                             #########",
+      "## S                           #########",
+      "#####   =   =   =   =  ##      #########",
+      "#####^^^^^^^^^^^^^^^^^^##      #########",
+      "#########################>     #########",
+      "#########################>     #########",
+      "#########################      #########",
+      "#########################     <#########",
+      "#########################     <#########",
+      "#########################      #########",
+      "#########################>     #########",
+      "#########################>     #########",
+      "#########################      #########",
+      "##vvvvvvvvvvvvvvvvvvvvvvv      vvvvv  ##",
+      "##                                    ##",
+      "##E                                   ##",
+      "##E                        C         K##",
+      "#####^^^##^^^##^^^##^^^########^^^^^####",
+      "########################################"
+    ] },
+  { floor: "L3", name: "Pressure Line", hint: "Ride each updraft only as far as you need. The ceiling is waiting.", saws: [{"a":[13,9],"b":[13,17],"t":100},{"a":[19,5],"b":[21,5],"t":60},{"o":[28,11],"rad":2,"t":120,"n":2},{"a":[25,6],"b":[31,6],"t":160}], via: [[6,12],[10,6],[13,9],[16,5],[20,7],[23,9],[28,14],[35,7]],
+    map: [
+      "########################################",
+      "########################################",
+      "##    vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv##",
+      "##                                    ##",
+      "##                         K          ##",
+      "##              C                     ##",
+      "##             ####                  E##",
+      "##      ####   ####                  E##",
+      "##      ####   ####              #######",
+      "##      ####   ####              #######",
+      "##      ####   ####   ###        #######",
+      "##      ####   ####   ###        <######",
+      "##      ####   ####   ###        <######",
+      "##      ####   ####   ###        <######",
+      "##      ####   ####   ###        #######",
+      "##      ####   ####   ###        #######",
+      "##      ####   ####   ###        #######",
+      "##      ####   ####   ###        #######",
+      "##      ####   ####   ###        #######",
+      "## S    ####   ####   ###        #######",
+      "#####   ####   ####   ###        #######",
+      "#####^F^####^F^####^F^###^^^F^^^^#######",
+      "########################################"
+    ] },
+  { floor: "L4", name: "Turbine Hall", hint: "The lifts go through the turbines. Pick the gap, not the lift.", saws: [{"o":[11,13],"rad":2.2,"t":150,"n":2},{"a":[16,4],"b":[16,12],"t":120},{"o":[28,9],"rad":2.5,"t":180,"n":3,"ccw":1}], plats: [{"a":[5,14],"b":[13,14],"t":300},{"a":[18,17],"b":[18,8],"t":240,"ph":0.25},{"a":[24,13],"b":[31,13],"t":240}], via: [[7,13],[14,13],[18,10],[22,9],[26,12],[33,10],[36,8]],
+    map: [
+      "########################################",
+      "########################################",
+      "##vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv##",
+      "##                                    ##",
+      "##                                    ##",
+      "##                                    ##",
+      "##           K                        ##",
+      "##                                   E##",
+      "##                                   E##",
+      "##                    C           ######",
+      "##                   ###          ######",
+      "##                   ###          ######",
+      "##                   vvv          ######",
+      "## S                              ######",
+      "#####                             ######",
+      "#####                             ######",
+      "#####                             ######",
+      "#####                             ######",
+      "#####                             ######",
+      "#####                             ######",
+      "#####                             ######",
+      "#####^^^^^^^^^^^^^^^^^^^^^^^^^^^^^######",
+      "########################################"
+    ] },
+  { floor: "L5", name: "Cooling Tunnel", hint: "Be in the air when the beat changes. Never on the block that leaves.", via: [[8,16],[20,15],[28,15],[34,18],[35,9],[32,5],[16,5],[3,5]],
+    map: [
+      "########################################",
+      "########################################",
+      "##      vvvvvvvvvvvvvvvvvvvvvvv       ##",
+      "##                                    ##",
+      "##E                                  <##",
+      "##E                            C     <##",
+      "#########RBBRRBBRRBBRRB}}}}}}}}#     <##",
+      "#########^^^^^^^^^^^^^^#########RR   <##",
+      "################################     <##",
+      "################################      ##",
+      "################################   BB ##",
+      "################################     <##",
+      "################################     <##",
+      "################################RR   <##",
+      "##   vvvvvvvvvvvvvvvvvvvvvvvvvvv     <##",
+      "##                                    ##",
+      "##                                 BB ##",
+      "##         BB      BB      BB         ##",
+      "##     RR      RR      RR             ##",
+      "## S         K                        ##",
+      "#####                           ########",
+      "#####^^^^^^^^^^^^^^^^^^^^^^^^^^^########",
+      "########################################"
+    ] },
+  { floor: "L6", name: "Kiln", hint: "The floor is not an option. Planks hold for half a second.", via: [[9,15],[13,12],[17,15],[22,15],[27,13],[30,9],[36,7]],
+    map: [
+      "########################################",
+      "########################################",
+      "##    vvvvvvvvvvvvvvvvvvvvvvvvvvvv    ##",
+      "##                                    ##",
+      "##                                    ##",
+      "##                                    ##",
+      "##                                   E##",
+      "##         #########                 E##",
+      "##         #########              ######",
+      "##         vvvvvvvvv    *         ######",
+      "##                            ==  ######",
+      "##                  K             ######",
+      "##                                ######",
+      "##           =                    ######",
+      "##                         =      ######",
+      "##               C                ######",
+      "##               ##               ######",
+      "##                                ######",
+      "##                                ######",
+      "## S     T            T           ######",
+      "######   #            #           ######",
+      "######^^^^^^^^^^^^^^^^^^^^^^^^^^^^######",
+      "########################################"
+    ] },
+  { floor: "L7", name: "Rolling Mill", hint: "Dash, then jump while the dash is still going. The belts will not help.", saws: [{"a":[7,19],"b":[11,19],"t":100},{"a":[21,19],"b":[25,19],"t":100,"ph":0.5},{"a":[34,7],"b":[37,7],"t":80},{"a":[9,4],"b":[14,4],"t":120}], via: [[12,18],[22,18],[35,18],[35,9],[32,6],[20,5],[10,6],[3,6]],
+    map: [
+      "########################################",
+      "########################################",
+      "##vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv##",
+      "##                                    ##",
+      "##                                    ##",
+      "##E                                   ##",
+      "##E                             C     ##",
+      "#####   }}}}}}}         }}}}}}}}##    ##",
+      "#####^^^#######^^^^^^^^^##########    ##",
+      "##################################    ##",
+      "##################################--  ##",
+      "##################################    ##",
+      "##################################    ##",
+      "##################################  --##",
+      "##################################    ##",
+      "##  vvvvvvvvvvvvvvvvvvvvvvvvvvvv      ##",
+      "##                                --  ##",
+      "##               K                    ##",
+      "##                                    ##",
+      "## S                               C  ##",
+      "######{{{{{{{        }}}}}      ########",
+      "#############^^^^^^^^#####^^^^^^########",
+      "########################################"
+    ] },
+  { floor: "L8", name: "Sluice", hint: "Up the chimneys. Kick off the clean wall, never the rusty one.", via: [[5,19],[9,12],[14,6],[18,10],[18,14],[23,18],[27,12],[34,5]],
+    map: [
+      "########################################",
+      "########################################",
+      "##########################vvvv##########",
+      "########vvvv##############    ##########",
+      "########    ##############    ##########",
+      "########>            #####>          E##",
+      "########>            #####>   ^^^^   E##",
+      "########>   #####   <#####>   ##########",
+      "########>   #####   <#####>   ##########",
+      "########>   #####>  <#####>   ##########",
+      "###    #    #####>  <#####    ##########",
+      "### K       #####>   #####    ##########",
+      "###         #####>   #####   <##########",
+      "###    #    #####>   #####   <##########",
+      "########   <##### C  #####   <##########",
+      "##         <##### == #####   <##########",
+      "##         <#####    #####    ##########",
+      "##         <#####             ##########",
+      "##         <#####             ##########",
+      "##          #####             ##########",
+      "## S        #####    ######FF###########",
+      "#########FF######^^^^###################",
+      "########################################"
+    ] },
+  { floor: "L9", name: "Old Generator", hint: "The rotor never stops. The blocks around it keep their own time.", saws: [{"o":[20,11],"rad":4.5,"t":240,"n":3}], via: [[9,17],[17,18],[26,18],[35,19],[35,8],[28,5],[17,5],[4,5]], hatvia: [[9,17],[17,18],[26,18],[35,19],[35,8],[28,5],[17,5],[11,5],[8,10],[4,5]],
+    map: [
+      "########################################",
+      "########################################",
+      "##     vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv##",
+      "##                                    ##",
+      "##E                                   ##",
+      "##E                                   ##",
+      "#######    RR    BB    RR   BB        ##",
+      "##                                    ##",
+      "##                                    ##",
+      "##                                 RR ##",
+      "##      K                             ##",
+      "##                                    ##",
+      "##                              BB    ##",
+      "##                                    ##",
+      "##                                    ##",
+      "##                                 RR ##",
+      "##                                    ##",
+      "##                                    ##",
+      "##      RR                   BB       ##",
+      "## S        BB  RR   BB  RR        C  ##",
+      "#######                          #######",
+      "#######^^^^^^^^^^^^^^^^^^^^^^^^^^#######",
+      "########################################"
+    ] },
+  { floor: "L10", name: "Overflow", hint: "Planks, air, a lift and saws. Nothing here holds still.", saws: [{"a":[22,8],"b":[24,8],"t":50},{"o":[33,13],"rad":2,"t":120,"n":3},{"a":[27,3],"b":[34,3],"t":140}], plats: [{"a":[5,14],"b":[12,14],"t":200},{"a":[26,18],"b":[26,7],"t":240}], via: [[8,13],[15,10],[19,11],[23,10],[27,8],[30,8],[33,16],[36,16]],
+    map: [
+      "########################################",
+      "########################################",
+      "##vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv##",
+      "##                                    ##",
+      "##                            K       ##",
+      "##                                    ##",
+      "##                                    ##",
+      "##                                    ##",
+      "##                            C       ##",
+      "##                            ##      ##",
+      "##                                    ##",
+      "##             ==                     ##",
+      "##                 ==                 ##",
+      "## S                                  ##",
+      "#####                                 ##",
+      "#####                                E##",
+      "#####                                E##",
+      "#####                             ######",
+      "#####                             ######",
+      "#####                             ######",
+      "#####                             ######",
+      "#####^^^^^^^^^^^^^^^^^^F^^^^^^^^^^######",
+      "########################################"
+    ] },
+  { floor: "L11", name: "Spillway", hint: "Everything from the tower and the basement, twice over.", saws: [{"a":[32,7],"b":[37,7],"t":90},{"a":[10,4],"b":[20,4],"t":160}], plats: [{"a":[23,18],"b":[29,18],"t":200}], via: [[10,19],[14,16],[17,16],[20,17],[24,17],[34,18],[34,9],[30,5],[16,5],[3,6]],
+    map: [
+      "########################################",
+      "########################################",
+      "##vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv##",
+      "##                                    ##",
+      "##          *                         ##",
+      "##E                                   ##",
+      "##E                           C       ##",
+      "##########     R  B  R  {{{{{{##      ##",
+      "##########^^^^^^^^^^^^^^########      ##",
+      "################################      ##",
+      "################################    --##",
+      "################################      ##",
+      "################################      ##",
+      "################################--    ##",
+      "##   vvvvvvvvvvvvvvvvvvvvvvvvvvv      ##",
+      "##         R                          ##",
+      "##         R                        --##",
+      "##         R     ==       K           ##",
+      "##         R        BB                ##",
+      "## S       R                      C   ##",
+      "####}}}}}}##                   #########",
+      "############^^F^^^^^^^^^^^^^^^^#########",
+      "########################################"
+    ] },
+  { floor: "L12", name: "Daylight", hint: "Three more levels of the old works, then the surface.", saws: [{"o":[16,11],"rad":1.5,"t":100,"n":2},{"o":[24,11],"rad":1.5,"t":100,"n":2,"ccw":1}], plats: [{"a":[17,15],"b":[6,15],"t":300,"w":3}], via: [[9,20],[24,19],[36,20],[36,13],[24,14],[4,14],[3,5],[12,5],[24,5],[36,6]], hatvia: [[9,20],[24,19],[36,20],[36,13],[24,14],[12,12],[4,14],[3,5],[12,5],[24,5],[36,6]],
+    map: [
+      "########################################",
+      "########################################",
+      "##    vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv##",
+      "##                                    ##",
+      "##           *             *          ##",
+      "##                  *                E##",
+      "##      T                            E##",
+      "##  #####        =      =         ######",
+      "##  #####^^^^^^^^^^^^^^^^^^^^^^^^^######",
+      "##  ####################################",
+      "##  vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv   ##",
+      "##                                    ##",
+      "##          K                         ##",
+      "##                                    ##",
+      "##  C                                 ##",
+      "######              ###   #########   ##",
+      "######^^^^^^^^^^^^^^###^^^#########>  ##",
+      "###################################   ##",
+      "##                               B    ##",
+      "##      o                   *    B    ##",
+      "## S         =    =              B  C ##",
+      "####{{{{{{            ###        #######",
+      "##########^^^^^^^^^^^^###^^^^^^^^#######"
     ] }
 ];
 /*END LEVELS*/
@@ -1200,8 +1519,13 @@ const LEVELS = [
   const { TS, COLS, ROWS, RW, RH, DT, K, DEAD, WIN, EV } = Engine;
   const $ = id => document.getElementById(id);
   const cv = $('c'), ctx = cv.getContext('2d');
-  const rooms = LEVELS.map(Engine.buildRoom);
-  const LAST = rooms.length - 1;
+  // Two games share the engine: the tower run (floor 12 down to B12) and Legacy (L1 to L12), each with its own saves.
+  const ALL = LEVELS.map(Engine.buildRoom);
+  const GAMES = {
+    main: { rooms: ALL.filter(r => !/^L/.test(r.def.floor)), save: 'fire-escape-run-v1', best: 'fire-escape-best-v2', prog: 'fire-escape-progress-v1' },
+    legacy: { rooms: ALL.filter(r => /^L/.test(r.def.floor)), save: 'fire-escape-legacy-run-v1', best: 'fire-escape-legacy-best-v1', prog: 'fire-escape-legacy-progress-v1' },
+  };
+  let game = 'main', rooms = GAMES.main.rooms, LAST = rooms.length - 1;
 
   const C = {
     wall: '#15181e', seam: '#1c2029', tie: '#0e1014',
@@ -1218,7 +1542,7 @@ const LEVELS = [
   };
 
   // ---------- storage (optional: private windows can refuse it) ----------
-  const SAVE = 'fire-escape-run-v1', BEST = 'fire-escape-best-v2', PROG = 'fire-escape-progress-v1';
+  let SAVE = GAMES.main.save, BEST = GAMES.main.best, PROG = GAMES.main.prog;
   const load = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
   const store = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
@@ -1243,7 +1567,7 @@ const LEVELS = [
 
   // ---------- static layer: wall, concrete, spikes, rails, door ----------
   function buildStatic(i) {
-    const Rm = rooms[i], cvs = document.createElement('canvas');
+    const Rm = ALL[i], cvs = document.createElement('canvas');
     cvs.width = RW; cvs.height = RH;
     const g = cvs.getContext('2d'), rnd = mulberry(i * 7919 + 17);
     g.fillStyle = C.wall; g.fillRect(0, 0, RW, RH);
@@ -1591,7 +1915,7 @@ const LEVELS = [
   }
 
   function render() {
-    const ri = rooms.indexOf(R);
+    const ri = ALL.indexOf(R);
     statics[ri] ||= buildStatic(ri);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, RW, RH);
@@ -1870,19 +2194,18 @@ const LEVELS = [
       best: rooms.map((_, i) => (p.best && p.best[i]) || null),
     };
   }
-  let prog = loadProg();
+  let prog = loadProg();  // replaced by setGame() once the page starts
   const saveProg = () => store(PROG, prog);
   const hatCount = () => prog.hats.filter(Boolean).length;
-  const label = r => (/^B/.test(r.def.floor) ? '' : 'FL ') + r.def.floor;
+  const label = r => (/^\d/.test(r.def.floor) ? 'FL ' : '') + r.def.floor;
 
   function enterRoom(i) {
     if (i > prog.reached) { prog.reached = i; saveProg(); }
     run.room = i; R = rooms[i]; S = Engine.initState(R);
-    statics[i] ||= buildStatic(i);
     parts.length = ghosts.length = tail.length = 0; springT.length = 0;
     cardT = 90; hintT = 420; deadT = winT = 0;
     $('card-t').textContent = R.def.name;
-    $('card-n').innerHTML = (/^B/.test(R.def.floor) ? '' : 'FL ') + '<span>' + R.def.floor + '</span>';
+    $('card-n').innerHTML = (/^\d/.test(R.def.floor) ? 'FL ' : '') + '<span>' + R.def.floor + '</span>';
     $('hint').textContent = R.def.hint;
     document.body.classList.toggle('nodash', !R.canDash);
     hud(true); save();
@@ -1970,8 +2293,10 @@ const LEVELS = [
       return `<button class="floor-card" data-i="${i}"${open ? '' : ' disabled'}><span class="n">${r.def.floor}</span><span>${open ? r.def.name : 'Locked'}</span>` +
         `<span class="meta">${b ? fmt(b.t) : ''}${prog.hats[i] ? '<span class="hat-tag">Hat</span>' : ''}</span></button>`;
     };
-    $('f-tower').innerHTML = rooms.map((r, i) => /^B/.test(r.def.floor) ? '' : card(r, i)).join('');
-    $('f-base').innerHTML = rooms.map((r, i) => /^B/.test(r.def.floor) ? card(r, i) : '').join('');
+    const groups = game === 'legacy' ? [['Old works', () => true]] : [['Tower', r => !/^B/.test(r.def.floor)], ['Basement', r => /^B/.test(r.def.floor)]];
+    $('f-kick').textContent = game === 'legacy' ? 'Legacy · Practice' : 'Practice';
+    $('f-groups').innerHTML = groups.map(([name, has]) =>
+      `<h3>${name}</h3><div class="grid">${rooms.map((r, i) => has(r) ? card(r, i) : '').join('')}</div>`).join('');
     show('floors');
   }
   document.addEventListener('click', e => {
@@ -1999,6 +2324,8 @@ const LEVELS = [
     const isBest = !skipped && (!best || t < best.time);
     if (isBest) store(BEST, { time: t, deaths: d });
     store(SAVE, null);
+    $('e-kick').textContent = game === 'legacy' ? 'Legacy cleared' : 'Riverbank';
+    $('e-title').textContent = game === 'legacy' ? 'You got out. Twice.' : 'You got out.';
     $('e-time').textContent = fmt(t); $('e-deaths').textContent = d;
     $('e-hats').textContent = run.hats.filter(Boolean).length + ' / ' + rooms.length;
     $('e-best').textContent = skipped
@@ -2019,6 +2346,28 @@ const LEVELS = [
     if (ok) $('b-continue').textContent = 'Continue on ' + label(rooms[saved.room]) + ' · ' + sum(saved.deaths) + ' deaths';
     $('b-new').classList.toggle('ghost', !!ok);
   }
+
+  // Tower or Legacy: swaps the floor list, the saves and the title text. Remembered between visits.
+  const STORY = {
+    main: ['24 floors &middot; 1 way out', 'Escape', $('t-story').innerHTML],
+    legacy: ['Legacy &middot; 12 floors &middot; hard', 'Legacy',
+      'Under the outfall the old works are still standing: the building this tower replaced, never cleared and never lit. Twelve more floors, with every trick from the tower and the basement on each of them, longer stretches between flags and less room for error. <strong>Finish the tower first.</strong>'],
+  };
+  function setGame(g, quiet) {
+    game = GAMES[g] ? g : 'main';
+    ({ rooms, save: SAVE, best: BEST, prog: PROG } = GAMES[game]);
+    LAST = rooms.length - 1; prog = loadProg();
+    if (!quiet) store('fire-escape-game', game);
+    document.body.classList.toggle('legacy', game === 'legacy');
+    for (const b of document.querySelectorAll('#title .mode')) b.setAttribute('aria-pressed', b.dataset.game === game);
+    [$('t-kick').innerHTML, $('t-sign').textContent, $('t-story').innerHTML] = STORY[game];
+    if (mode === 'title') {
+      const saved = normRun(load(SAVE));
+      R = rooms[saved ? saved.room : 0]; S = Engine.initState(R);
+      titleBest();
+    }
+  }
+  for (const b of document.querySelectorAll('#title .mode')) b.onclick = () => { audioOn(); setGame(b.dataset.game); };
 
   $('b-new').onclick = () => { audioOn(); newRun(); };
   $('b-continue').onclick = () => { audioOn(); run = normRun(load(SAVE)); enterRoom(run.room); play(); };
@@ -2100,8 +2449,9 @@ const LEVELS = [
   document.fonts?.ready.then(() => { statics = []; });
 
   // Viewer hot-reload: keep the run when the page is republished.
-  window.claude?.hot?.snapshot?.(() => ({ run, mode: mode === 'play' ? 'pause' : mode }));
+  window.claude?.hot?.snapshot?.(() => ({ run, game, mode: mode === 'play' ? 'pause' : mode }));
   function start(data) {
+    setGame(data?.game || load('fire-escape-game'), true);
     if (data && normRun(data.run)) {
       run = normRun(data.run); enterRoom(run.room);
       if (data.mode === 'pause') { mode = 'play'; pause(); } else { mode = 'title'; titleBest(); show('title'); }

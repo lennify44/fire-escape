@@ -19,6 +19,16 @@ for (const kv of (GLib.getenv('KSET') || '').split(',').filter(Boolean)) { const
 const LAND = GLib.getenv('HUMAN') ? 4 : 0;
 if (GLib.getenv('HUMAN')) Object.assign(E.K, { coyote: 1, edge: 5, wjReach: 2, hz: E.K.hz + 2 });
 for (const kv of (GLib.getenv('KSET2') || '').split(',').filter(Boolean)) { const [k, v] = kv.split('='); E.K[k] = +v; }
+// SLOP=2 (on by default with HUMAN=1, SLOP=0 turns it off): no input has to be frame perfect. Every time the bot
+// presses or releases jump, starts a dash or changes direction, the same change is also played SLOP frames early
+// and SLOP frames late. Such a sloppy copy keeps the planned inputs, except that after SLOP_REACT frames it may
+// steer left or right back towards the planned line, the way a person corrects in the air; a jump or dash that went
+// off at the wrong moment cannot be taken back. Each copy has to stay alive until it is back on its feet (or
+// SLOP_LIFE frames pass), or the move does not count.
+// TIGHT=1 searches without SLOP, then replays the route it found and prints each move that would fail it.
+const TIGHT = !!GLib.getenv('TIGHT');
+let SLOP = TIGHT ? 0 : +(GLib.getenv('SLOP') ?? (GLib.getenv('HUMAN') ? 2 : 0));
+const SLOP_REACT = 8, SLOP_LIFE = 60, SLOP_GROUND = 20, SLOP_MAX = 8;
 function footing(R, s) {
   const p = s.p, y = p.y + E.K.ph, r = Math.floor(y / 16);
   let n = 0;
@@ -73,6 +83,48 @@ function key(R, s) {
   return k + (s.got ? 'K' : '') + (p.pl >= 0 ? 'P' + p.pl : '');
 }
 
+// Sloppy copies of the run (see SLOP): {s, age, air}. Plays action a on copy c, steering towards x = tx once it
+// has had time to react; returns -1 dead, 1 safe again, 0 still pending.
+const len = a => a.frames || KF;
+function advance(R, c, a, n = len(a), tx = null) {
+  for (let k = 0; k < n; k++) {
+    const d = tx === null || a.dash || c.age < SLOP_REACT ? 0 : tx - c.s.p.x;
+    const res = E.step(R, c.s, Math.abs(d) > 1 ? { ...a, x: Math.sign(d) } : a);
+    if (res === E.DEAD) return -1;
+    if (res === E.WIN || ++c.age >= SLOP_LIFE) return 1;
+    if (!c.s.p.g) c.air = true;
+    else if (c.air || c.age >= SLOP_GROUND) return 1;
+  }
+  return 0;
+}
+const changed = (prev, a) => prev && (a.x !== prev.x || a.jump !== prev.jump || (a.dash && !prev.dash));
+// The copies a child inherits from node after action a, plus new ones if a changes the input; null if one dies.
+function sloppy(R, node, a, s) {
+  const prev = node.act, out = [], same = key(R, s);
+  const keep = c => { if (key(R, c.s) !== same) out.push(c); };
+  for (const sh of node.sh) {
+    const c = { s: E.cloneState(sh.s), age: sh.age, air: sh.air }, r = advance(R, c, a, len(a), s.p.x);
+    if (r < 0) return null;
+    if (!r) keep(c);
+  }
+  if (changed(prev, a)) {
+    const late = { s: E.cloneState(node.s), age: 0, air: false };
+    let r = advance(R, late, prev, SLOP);
+    if (!r) r = advance(R, late, a, len(a) - SLOP, s.p.x);
+    if (r < 0) return null;
+    if (!r) keep(late);
+    if (node.parent && len(prev) >= SLOP) {
+      const early = { s: E.cloneState(node.parent.s), age: 0, air: false };
+      for (let k = 0; k < len(prev) - SLOP; k++) E.step(R, early.s, prev);
+      r = advance(R, early, a, len(a) + SLOP, s.p.x);
+      if (r < 0) return null;
+      if (!r) keep(early);
+    }
+  }
+  out.sort((x, y) => x.age - y.age);
+  return out.slice(0, SLOP_MAX);
+}
+
 function solve(idx, cp = -1) {
   const def = LEVELS[idx], R = E.buildRoom(def), dist = distField(R, R.exit);
   // HAT=1: only a clear that picked up the gold hard hat on the way counts
@@ -80,7 +132,7 @@ function solve(idx, cp = -1) {
   const hatToExit = wantHat && dist[Math.floor((R.hat.y + 5) / 16) * E.COLS + Math.floor((R.hat.x + 5) / 16)];
   if (GLib.getenv('HAT') && !R.hat) { print(`${idx + 1}. ${def.name}: no hat on this floor`); return true; }
   // Waypoints (via) steer the search along the intended route: h = distance to the next one + the rest of the chain.
-  const via = (!wantHat && def.via) || [];
+  const via = (wantHat ? def.hatvia : def.via) || [];  // a hat run follows hatvia, if the floor has one
   const viaDist = via.map(([c, r]) => distField(R, { x: c * 16, y: r * 16, w: 16, h: 16 }));
   const rest = via.map((_, i) => { let sum = 0; for (let j = i; j < via.length; j++) { const [c, r] = via[j + 1] || []; sum += j + 1 < via.length ? viaDist[j + 1][via[j][1] * E.COLS + via[j][0]] : dist[via[j][1] * E.COLS + via[j][0]]; } return sum; });
   const h = (s, wp = via.length) => {
@@ -89,15 +141,18 @@ function solve(idx, cp = -1) {
     if (wp < via.length) return viaDist[wp][r * E.COLS + c] + rest[wp];
     return wantHat && !s.got ? hatDist[r * E.COLS + c] + hatToExit : dist[r * E.COLS + c];
   };
+  // a waypoint on the hat itself only counts once the hat is picked up
+  const hatWp = wantHat ? via.findIndex(([c, r]) => c === Math.floor(R.hat.x / 16) && r === Math.floor(R.hat.y / 16)) : -1;
   const nextWp = (s, wp) => {
     while (wp < via.length) {
+      if (wp === hatWp && !s.got) break;
       const c = Math.floor((s.p.x + 5) / 16), r = Math.floor((s.p.y + 7) / 16);
       if (r < 0 || r >= E.ROWS || viaDist[wp][r * E.COLS + c] > 1) break;
       wp++;
     }
     return wp;
   };
-  const root = { s: E.initState(R, cp), g: 0, parent: null, act: null, wp: 0 };
+  const root = { s: E.initState(R, cp), g: 0, parent: null, act: null, wp: 0, sh: [] };
   let wp0 = 0;
   if (cp >= 0 && via.length) {
     const ck = R.checks[cp], i0 = Math.floor((ck.sy + 7) / 16) * E.COLS + Math.floor((ck.sx + 5) / 16);
@@ -110,7 +165,10 @@ function solve(idx, cp = -1) {
   let n = 0, goal = null, best = 1e9, bestNode = root;
   const t0 = Date.now();
   while (open.size && n < MAX) {
-    const node = open.pop(); n++;
+    const node = open.pop();
+    // sloppy copies are only checked for positions the search actually explores (cheaper than for every child)
+    if (!node.sh) { node.sh = sloppy(R, node.parent, node.act, node.s); if (!node.sh) { seen.delete(node.kk); continue; } }
+    n++;
     let acts = !globalThis.NODASH && node.s.p.dash && !node.s.p.dt ? BASE.concat(DASHES) : BASE;
     if (R.period > 1 && node.s.p.g) acts = acts.concat([WAIT]);
     for (const a of acts) {
@@ -119,9 +177,16 @@ function solve(idx, cp = -1) {
       for (let k = 0; k < (a.frames || KF) && !res; k++) res = E.step(R, s, a);
       if (res === E.DEAD) continue;
       if (LAND && (s.ev & E.EV.LAND) && footing(R, s) < LAND) continue;
-      const child = { s, g: node.g + 1, parent: node, act: a, wp: nextWp(s, node.wp) };
-      if (res === E.WIN) { if (wantHat && !s.got) continue; goal = child; break; }
-      const kk = key(R, s) + '#' + child.wp;
+      const child = { s, g: node.g + 1, parent: node, act: a, wp: nextWp(s, node.wp), sh: SLOP ? null : [] };
+      if (res === E.WIN) {
+        if (wantHat && !s.got) continue;
+        // the last move has to be forgiving too: its sloppy copies must reach the door as well, or at least survive
+        const sh = SLOP ? sloppy(R, node, a, s) : [];
+        if (!sh || !sh.every(c => { for (let k = 0; k < SLOP_LIFE; k++) { const r = E.step(R, c.s, a); if (r) return r === E.WIN; } return true; })) continue;
+        goal = child; break;
+      }
+      const shaky = SLOP && (node.sh.length || changed(node.act, a));
+      const kk = child.kk = key(R, s) + '#' + child.wp + (shaky ? '~' : '');
       if (seen.has(kk)) continue;
       seen.add(kk);
       const hv = h(s, child.wp);
@@ -156,6 +221,20 @@ function solve(idx, cp = -1) {
   }
   const dashes = acts.filter((a, i) => a.dash && !(acts[i - 1] || {}).dash).length;
   print(`${label}: solved in ${(frames / 60).toFixed(2)} s, ${dashes} dashes, ${n} nodes (${ms} ms)${res === E.WIN ? '' : '  !! REPLAY FAILED'}`);
+  if (TIGHT) {
+    SLOP = +(GLib.getenv('SLOP') || 2);
+    let cur = { s: E.initState(R, cp), act: null, parent: null, sh: [] }, f = 0;
+    for (const a of acts) {
+      const s = E.cloneState(cur.s);
+      for (let k = 0; k < len(a); k++) E.step(R, s, a);
+      const sh = sloppy(R, cur, a, s), p = cur.s.p;
+      const was = cur.act || {}, what = a.dash ? 'dash' : a.jump && !was.jump ? 'jump' : !a.jump && was.jump ? 'release jump' : 'steer';
+      const dir = [a.x < 0 ? 'left' : a.x > 0 ? 'right' : '', a.dash && a.y < 0 ? 'up' : a.dash && a.y > 0 ? 'down' : ''].filter(Boolean).join(' ');
+      if (!sh) print(`  tight at ${(f / 60).toFixed(2)} s, column ${Math.floor((p.x + 5) / 16)}, row ${Math.floor((p.y + 7) / 16)}: ${what}${dir ? ' ' + dir : ''}`);
+      cur = { s, act: a, parent: cur, sh: sh || [] }; f += len(a);
+    }
+    SLOP = 0;
+  }
   if (GLib.getenv('MAP')) {
     const rows = def.map.map((l, r) => [...l.padEnd(E.COLS)].map((ch, c) => trail.has(r * E.COLS + c) && ch === ' ' ? '·' : ch).join(''));
     print(rows.join('\n'));
@@ -166,6 +245,8 @@ function solve(idx, cp = -1) {
 const list = which === 'all' ? LEVELS.map((_, i) => i) : which.split(',').map(x => +x - 1);
 let ok = true;
 for (const i of list) {
+  // CP=2 proves the floor from its second checkpoint only
+  if (GLib.getenv('CP')) { ok = solve(i, +GLib.getenv('CP') - 1) && ok; continue; }
   ok = solve(i) && ok;
   // CPS=1 also proves the floor from every checkpoint
   if (GLib.getenv('CPS')) E.buildRoom(LEVELS[i]).checks.forEach((_, c) => { ok = solve(i, c) && ok; });
