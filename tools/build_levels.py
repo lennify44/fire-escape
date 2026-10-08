@@ -11,6 +11,9 @@ for n, line in enumerate((root / 'tools/levels.txt').read_text().splitlines(), 1
         cur = {'floor': floor, 'name': name, 'hint': hint, 'map': []}
         if 'nodash' in flags:
             cur['dash'] = False
+        for fl in flags:
+            if fl.startswith('par='):
+                cur['par'] = float(fl[4:])
         rooms.append(cur)
     elif line.startswith(('saws:', 'plats:', 'via:')):
         key, val = line.split(':', 1)
@@ -30,6 +33,8 @@ for r in rooms:
 
 def extras(r):
     out = ' dash: false,' if r.get('dash') is False else ''
+    if 'par' in r:
+        out += ' par: %s,' % r['par']
     for key in ('saws', 'plats', 'via'):
         if key in r:
             out += f' {key}: ' + json.dumps(r[key], separators=(',', ':')) + ','

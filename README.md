@@ -17,12 +17,15 @@ Alles steckt in einer einzigen Datei: `index.html` im Browser öffnen und losspi
 | R | Select | – | zurück zur letzten Checkpoint-Fahne |
 | Esc / P | Start | II | Pause: Etage neu starten, überspringen, Ton |
 | M | – | – | Ton an/aus |
+| G | – | Pausenmenü | Geist an/aus |
 
 - **Wandsprung:** an einer Wand noch einmal springen.
 - **Super:** während eines Dashes am Boden springen – der Sprung behält das Dash-Tempo.
   Schräg nach unten in den Boden dashen und dann springen ergibt einen flacheren, schnelleren **Hyper**.
 - **Goldene Bauhelme:** einer pro Etage, meist abseits des Wegs. Er zählt, wenn du damit den Ausgang erreichst.
 - **Etagen-Auswahl** auf dem Titelbildschirm: jede erreichte Etage einzeln üben, mit Bestzeit und Helm.
+- **Geist:** ein blasser Läufer spielt jede Etage neben dir durch und zeigt einen Weg, der funktioniert. Er startet
+  bei jedem Neuversuch mit dir zusammen, auch ab Checkpoints. Mit **G** oder im Pausenmenü abschaltbar.
 - Fortschritt, Helme und Bestzeiten speichert der Browser (localStorage).
 - **Versteckter Entwickler-Modus:** fünfmal schnell auf den Titel „Fire Escape“ tippen (oder auf dem Titelbildschirm
   `dev` tippen). Dann sind alle Etagen offen, im Pausenmenü gibt es „Skip floor“ auch beim Üben und
@@ -57,15 +60,27 @@ Alles steckt in einer einzigen Datei: `index.html` im Browser öffnen und losspi
 | B11 | Pump Station | alles auf einer Etage |
 | B12 | Outfall | Finale, drei Ebenen bis zum Fluss |
 
+## Weitere Modi
+
+- **Night Shift:** 24 kurze Läufe über je einen Bildschirm, ohne Checkpoints, gegen die Uhr. Ins Ziel = Bronze,
+  nah an der Zielzeit = Silber, schneller als die Zielzeit = Gold. Jeder geschaffte Lauf schaltet den nächsten frei.
+  Drei Schichten: Bewegung, Maschinen, „Lights out“.
+- **Deep Basement:** endlos. Unter B12 geht die Treppe weiter (B13, B14, …). Jede Etage wird aus kleinen, einzeln
+  geprüften Bausteinen zusammengesetzt und wird mit der Tiefe gemeiner. Gezählt wird die tiefste erreichte Etage.
+
 ## Level bearbeiten
 
 Die Etagen stehen als ASCII-Karten (40 × 23 Kacheln) in `tools/levels.txt`; die Legende steht oben in der Datei.
-Die Kellergeschosse werden aus `tools/design/basement_*.py` erzeugt (Hilfsfunktionen statt Handarbeit).
+Die Kellergeschosse werden aus `tools/design/basement_*.py` erzeugt, die Night-Shift-Läufe aus
+`tools/design/night_*.py`, die Bausteine des Deep Basement aus `tools/design/endless_chunks.py`.
 Nach einer Änderung:
 
 ```sh
 python3 tools/build_levels.py   # schreibt die Level in index.html
 tools/check.sh                  # prüft jede Etage mit dem Bot
+python3 tools/par.py            # Goldzeiten der Night-Shift-Läufe aus den Bot-Zeiten (danach build_levels.py)
+python3 tools/ghosts.py         # nimmt die Geister-Läufe neu auf (nach jeder Level- oder Physikänderung)
+gjs tools/syntax.js             # prüft, dass alle Skripte in index.html parsen
 ```
 
 Die Werkzeuge laufen mit `gjs` (bei Fedora/GNOME dabei), Node wird nicht gebraucht.
@@ -78,3 +93,4 @@ Die Werkzeuge laufen mit `gjs` (bei Fedora/GNOME dabei), Node wird nicht gebrauc
 - `HAT=1` zählt nur Durchläufe, die unterwegs den goldenen Helm einsammeln.
 - `via:` in `levels.txt` gibt dem Bot Wegpunkte in der gedachten Reihenfolge; das Spiel ignoriert sie.
 - `tools/window.js` misst für Sprünge ohne Dash, wie viele Frames Spielraum beim Absprung bleiben.
+- `gjs tools/solve.js c` prüft jeden Deep-Basement-Baustein einzeln, `gjs tools/solve.js e1-40` die ersten 40 erzeugten Etagen.

@@ -6,17 +6,21 @@ const htmlPath = GLib.getenv('GAME') || here + '/index.html';
 const html = new TextDecoder().decode(GLib.file_get_contents(htmlPath)[1]);
 if (GLib.getenv('NODASH')) globalThis.NODASH = 1;
 const block = n => html.split('/*' + n + '*/')[1].split('/*END ' + n + '*/')[0];
-const { Engine: E, LEVELS } = new Function(block('ENGINE') + block('LEVELS') + ';return {Engine, LEVELS};')();
+const { Engine: E, LEVELS, Endless } = new Function(block('ENGINE') + block('LEVELS') + (html.includes('/*ENDLESS*/') ? block('ENDLESS') : 'const Endless = null;') + ';return {Engine, LEVELS, Endless};')();
 
 // NERF=0.03 scales run, jump, wall-jump, dash and spring speeds down by 3%; HZ=2 grows hazards by 2px.
 // A room that still solves under a small nerf has slack; one that fails a bigger nerf is tight.
+const K0 = { ...E.K }; // the game's own physics, before any handicap below
 const nerf = +(GLib.getenv('NERF') || 0);
 for (const k of ['run', 'jump', 'wjV', 'wjH', 'dashV', 'dashEnd', 'spring']) E.K[k] *= 1 - nerf;
 E.K.hz = +(GLib.getenv('HZ') || 0);
 for (const kv of (GLib.getenv('KSET') || '').split(',').filter(Boolean)) { const [k, v] = kv.split('='); E.K[k] = +v; }
 // HUMAN=1 plays like a decent person instead of a perfect one: no coyote frames, jumps at least 5 frames
 // before the edge, lands with at least 4 px of foot on the platform, hazards 2 px bigger, wall kicks from 2 px.
-const LAND = GLib.getenv('HUMAN') ? 4 : 0;
+// GHOSTSAFE=1 (for recording ghosts): keep 2 px from hazards and land with 4 px of foot, but change no physics,
+// so the recorded inputs replay exactly in the game.
+const LAND = GLib.getenv('HUMAN') || GLib.getenv('GHOSTSAFE') ? 4 : 0;
+if (GLib.getenv('GHOSTSAFE')) E.K.hz += 2;
 if (GLib.getenv('HUMAN')) Object.assign(E.K, { coyote: 1, edge: 5, wjReach: 2, hz: E.K.hz + 2 });
 for (const kv of (GLib.getenv('KSET2') || '').split(',').filter(Boolean)) { const [k, v] = kv.split('='); E.K[k] = +v; }
 function footing(R, s) {
@@ -26,7 +30,17 @@ function footing(R, s) {
   if (p.pl >= 0) { const b = E.platsAt(R, s.f)[p.pl]; n = Math.max(n, Math.min(p.x + E.K.pw, b.x + b.w) - Math.max(p.x, b.x)); }
   return n;
 }
-const [which = 'all', kArg = '3', maxArg = '1500000', wArg = '3'] = ARGV;
+let [which = 'all', kArg = '3', maxArg = '1500000', wArg = '3'] = ARGV;
+// Deep Basement: "e1-40" solves generated rooms 1 to 40, "c" solves every piece on its own
+let ROOMS = LEVELS;
+if (/^e\d/.test(which)) {
+  const [a, b] = which.slice(1).split('-').map(Number);
+  ROOMS = []; for (let n = a; n <= (b || a); n++) ROOMS.push(Endless.room(n));
+  which = 'all';
+} else if (which === 'c') {
+  ROOMS = Endless.PIECES.map((_, i) => Endless.pieceRoom(i));
+  which = 'all';
+}
 const KF = +kArg, MAX = +maxArg, W = +wArg;
 
 class Heap {
@@ -59,6 +73,7 @@ function distField(R, ex) {
 
 const BASE = [];
 for (const x of [-1, 0, 1]) for (const jump of [false, true]) BASE.push({ x, y: 0, jump, dash: false });
+const GHOST_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJ'; // 36 input combinations, see GHOST below
 const WAIT = { x: 0, y: 0, jump: false, dash: false, frames: 15 }; // stand still through a beat or a saw pass
 const DASHES = [];
 for (const y of [-1, 0, 1]) for (const x of [-1, 0, 1]) if (x || y) DASHES.push({ x, y, jump: false, dash: true });
@@ -74,7 +89,7 @@ function key(R, s) {
 }
 
 function solve(idx, cp = -1) {
-  const def = LEVELS[idx], R = E.buildRoom(def), dist = distField(R, R.exit);
+  const def = ROOMS[idx], R = E.buildRoom(def), dist = distField(R, R.exit);
   // HAT=1: only a clear that picked up the gold hard hat on the way counts
   const wantHat = GLib.getenv('HAT') && R.hat, hatDist = wantHat && distField(R, R.hat);
   const hatToExit = wantHat && dist[Math.floor((R.hat.y + 5) / 16) * E.COLS + Math.floor((R.hat.x + 5) / 16)];
@@ -93,6 +108,7 @@ function solve(idx, cp = -1) {
     while (wp < via.length) {
       const c = Math.floor((s.p.x + 5) / 16), r = Math.floor((s.p.y + 7) / 16);
       if (r < 0 || r >= E.ROWS || viaDist[wp][r * E.COLS + c] > 1) break;
+      if (via[wp][2] && !s.p.g) break; // [c, r, 1]: only counts while standing (on a lift, say)
       wp++;
     }
     return wp;
@@ -160,14 +176,31 @@ function solve(idx, cp = -1) {
     const rows = def.map.map((l, r) => [...l.padEnd(E.COLS)].map((ch, c) => trail.has(r * E.COLS + c) && ch === ' ' ? '·' : ch).join(''));
     print(rows.join('\n'));
   }
+  // GHOST=1: print the inputs as a ghost run, but only if they also reach the exit under the game's normal physics
+  if (GLib.getenv('GHOST') && res === E.WIN) {
+    const codes = [];
+    for (const a of acts) {
+      const code = (a.x + 1) * 12 + (a.y + 1) * 4 + (a.jump ? 2 : 0) + (a.dash ? 1 : 0), n = a.frames || KF;
+      if (codes.length && codes[codes.length - 1][0] === code) codes[codes.length - 1][1] += n; else codes.push([code, n]);
+    }
+    const enc = codes.map(([c, n]) => GHOST_CHARS[c] + n).join('');
+    const handicap = { ...E.K }; Object.assign(E.K, K0);
+    const g = E.initState(R, cp); let gr = 0;
+    for (const [c, n] of codes) {
+      const inp = { x: Math.floor(c / 12) - 1, y: Math.floor(c % 12 / 4) - 1, jump: !!(c & 2), dash: !!(c & 1) };
+      for (let k = 0; k < n && !gr; k++) gr = E.step(R, g, inp);
+    }
+    Object.assign(E.K, handicap);
+    print(gr === E.WIN ? `GHOST ${def.floor} ${cp} ${enc}` : `GHOST-DIVERGED ${def.floor} ${cp}`);
+  }
   return res === E.WIN;
 }
 
-const list = which === 'all' ? LEVELS.map((_, i) => i) : which.split(',').map(x => +x - 1);
+const list = which === 'all' ? ROOMS.map((_, i) => i) : which.split(',').map(x => +x - 1);
 let ok = true;
 for (const i of list) {
   ok = solve(i) && ok;
   // CPS=1 also proves the floor from every checkpoint
-  if (GLib.getenv('CPS')) E.buildRoom(LEVELS[i]).checks.forEach((_, c) => { ok = solve(i, c) && ok; });
+  if (GLib.getenv('CPS')) E.buildRoom(ROOMS[i]).checks.forEach((_, c) => { ok = solve(i, c) && ok; });
 }
 if (!ok) imports.system.exit(1);
