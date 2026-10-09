@@ -215,7 +215,7 @@
   <div class="inner">
     <div class="kicker">Second mode</div>
     <h2>Night Shift</h2>
-    <p>The building is empty after dark. Short runs on one screen each, no checkpoints, against the clock. Finish for bronze, get close to the target for silver, beat it for gold. Each run you finish opens the next.</p>
+    <p>The building is empty after dark. Short runs on one screen each, no checkpoints, against the clock. Finish for bronze, get close to the target for silver, beat it for gold. Each run you finish opens the next. A gold ghost replays your own best run, so you can race it.</p>
     <div id="n-msg" hidden></div>
     <div id="n-sets"></div>
     <div class="row"><button class="ghost" id="b-nights-back">Back</button></div>
@@ -2741,7 +2741,7 @@ const GHOSTS = {"12":{"-1":"e3s3E9C9E3C6E3C3E12C3E6C9e3C3e3E3g3E9C3E9C3E3C6E15C3
   }
   function nightWin() {
     const i = run.room, r = nights[i], t = run.att, old = nprog.best[i], m = medal(r, t);
-    if (old == null || t < old) { nprog.best[i] = t; store(NIGHT, nprog); }
+    if (old == null || t < old) { nprog.best[i] = t; store(NIGHT, nprog); saveBestRun(); }
     run.msg = `${r.def.floor} ${r.def.name}: ${fmt(t)}, ${m}${old == null || t < old ? (old == null ? '' : ' · new best') : ' · best ' + fmt(old)}. Gold is ${fmt(parFrames(r))}.`;
     hud(true);
   }
@@ -2799,45 +2799,69 @@ const GHOSTS = {"12":{"-1":"e3s3E9C9E3C6E3C3E12C3E6C9e3C3e3E3g3E9C3E9C3E3C6E15C3
     show('pause'); if (!document.body.classList.contains('touch')) $('b-resume').focus(); save();
   }
   function resume() { mode = 'play'; show(null); held.clear(); }
-  // ---------- ghost: replays a recorded run (tools/ghosts.py) through the same engine, frame for frame ----------
-  const GHOST_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJ';
-  let ghostOn = load('fire-escape-ghost') !== false, runner = null;
-  function startGhost() {
-    runner = null;
-    const enc = ghostOn && !R.def.endless && typeof GHOSTS !== 'undefined' && GHOSTS[R.def.floor] && GHOSTS[R.def.floor][String(S.cp)];
-    if (!enc) return;
+  // ---------- ghosts: replay recorded inputs through the same engine, frame for frame ----------
+  // Blue: the bot's run from tools/ghosts.py. Gold (Night Shift): your own best run, recorded while you play.
+  const GHOST_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJ', PB = 'fire-escape-pb-v1';
+  let ghostOn = load('fire-escape-ghost') !== false, runners = [], rec = null;
+  const inputCode = inp => (inp.x + 1) * 12 + (inp.y + 1) * 4 + (inp.jump ? 2 : 0) + (inp.dash ? 1 : 0);
+  function decodeRun(enc) {
     const seq = [];
     for (const m of enc.matchAll(/([a-zA-J])(\d+)/g)) {
       const c = GHOST_CHARS.indexOf(m[1]);
       seq.push([{ x: Math.floor(c / 12) - 1, y: Math.floor(c % 12 / 4) - 1, jump: !!(c & 2), dash: !!(c & 1) }, +m[2]]);
     }
-    runner = { S: Engine.initState(R, S.cp, S.got), seq, i: 0, n: 0, fade: 0, gone: false };
+    return seq;
+  }
+  function startGhost() {
+    runners = [];
+    rec = run && run.night ? [] : null; // every Night Shift attempt is recorded; a new best becomes the gold ghost
+    if (!ghostOn || R.def.endless) return;
+    const make = (enc, color) => ({ S: Engine.initState(R, S.cp, S.got), seq: decodeRun(enc), i: 0, n: 0, fade: 0, gone: false, color });
+    const bot = typeof GHOSTS !== 'undefined' && GHOSTS[R.def.floor] && GHOSTS[R.def.floor][String(S.cp)];
+    if (bot) runners.push(make(bot, '#9ccfff'));
+    const mine = run && run.night && S.cp < 0 && (load(PB) || {})[R.def.floor];
+    if (mine) runners.push(make(mine, '#f2c45a'));
+  }
+  function recordInput(inp) {
+    if (!rec) return;
+    const c = inputCode(inp), last = rec[rec.length - 1];
+    if (last && last[0] === c) last[1]++; else rec.push([c, 1]);
+  }
+  function saveBestRun() {
+    if (!rec) return;
+    const all = load(PB) || {};
+    all[R.def.floor] = rec.map(([c, n]) => GHOST_CHARS[c] + n).join('');
+    store(PB, all);
   }
   function stepGhost() {
-    if (!runner || runner.gone) return;
-    if (runner.fade) { if (--runner.fade === 0) runner.gone = true; return; }
-    const cur = runner.seq[runner.i];
-    if (!cur) { runner.gone = true; return; }
-    const r = Engine.step(R, runner.S, cur[0]);
-    if (++runner.n >= cur[1]) { runner.i++; runner.n = 0; }
-    if (r === WIN) runner.fade = 30; else if (r) runner.gone = true;
+    for (const g of runners) {
+      if (g.gone) continue;
+      if (g.fade) { if (--g.fade === 0) g.gone = true; continue; }
+      const cur = g.seq[g.i];
+      if (!cur) { g.gone = true; continue; }
+      const r = Engine.step(R, g.S, cur[0]);
+      if (++g.n >= cur[1]) { g.i++; g.n = 0; }
+      if (r === WIN) g.fade = 30; else if (r) g.gone = true;
+    }
   }
   function drawGhost() {
-    if (!runner || runner.gone) return;
-    const p = runner.S.p, run = p.g && Math.abs(p.vx) > 15, ph = run ? (tick >> 2) & 1 : 0;
-    ctx.save();
-    ctx.globalAlpha = 0.42 * (runner.fade ? runner.fade / 30 : 1);
-    ctx.translate(p.x + 5, p.y + 14); ctx.scale(p.face, 1); ctx.translate(-5, -14);
-    ctx.fillStyle = '#9ccfff';
-    ctx.fillRect(3, 1, 5, 5); ctx.fillRect(2, 0, 6, 2); ctx.fillRect(1, 6, 8, 5);
-    if (p.g) { ctx.fillRect(2 + ph, 11, 3, 3); ctx.fillRect(6 - ph, 11, 3, 3); } else { ctx.fillRect(2, 10, 3, 3); ctx.fillRect(6, 10, 3, 2); }
-    ctx.fillStyle = '#e8f5ff'; ctx.fillRect(6, 3, 1, 1);
-    ctx.restore();
+    for (const g of runners) {
+      if (g.gone) continue;
+      const p = g.S.p, run = p.g && Math.abs(p.vx) > 15, ph = run ? (tick >> 2) & 1 : 0;
+      ctx.save();
+      ctx.globalAlpha = 0.42 * (g.fade ? g.fade / 30 : 1);
+      ctx.translate(p.x + 5, p.y + 14); ctx.scale(p.face, 1); ctx.translate(-5, -14);
+      ctx.fillStyle = g.color;
+      ctx.fillRect(3, 1, 5, 5); ctx.fillRect(2, 0, 6, 2); ctx.fillRect(1, 6, 8, 5);
+      if (p.g) { ctx.fillRect(2 + ph, 11, 3, 3); ctx.fillRect(6 - ph, 11, 3, 3); } else { ctx.fillRect(2, 10, 3, 3); ctx.fillRect(6, 10, 3, 2); }
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(6, 3, 1, 1);
+      ctx.restore();
+    }
   }
   function toggleGhost() {
     ghostOn = !ghostOn; store('fire-escape-ghost', ghostOn);
     $('b-ghost').textContent = 'Ghost: ' + (ghostOn ? 'on' : 'off');
-    if (ghostOn) { if (!runner) startGhost(); } else runner = null;
+    if (!ghostOn) runners = []; // turning it back on takes effect from the next attempt
   }
 
   function toggleMute() { muted = !muted; store('fire-escape-muted', muted); $('b-mute').textContent = 'Sound: ' + (muted ? 'off' : 'on'); }
@@ -2925,6 +2949,7 @@ const GHOSTS = {"12":{"-1":"e3s3E9C9E3C6E3C3E12C3E6C9e3C3e3E3g3E9C3E9C3E3C6E15C3
       hintT = 150;
     }
     lastDash = inp.dash;
+    recordInput(inp);
     const res = Engine.step(R, S, inp);
     stepGhost();
     effects(S.ev);
